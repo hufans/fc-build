@@ -1,141 +1,207 @@
 <div align="center">
 
-<h1>
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="https://media.x.ai/v1/website/spacexai-symbol-white-transparent-0c31957f.png">
-    <source media="(prefers-color-scheme: light)" srcset="https://media.x.ai/v1/website/spacexai-symbol-black-transparent-6435cf42.png">
-    <img alt="SpaceXAI logo" src="https://media.x.ai/v1/website/spacexai-symbol-black-transparent-6435cf42.png" width="96">
-  </picture>
-  <br>
-  Grok Build (<code>grok</code>)
-</h1>
+# Kiro (`kiro`)
 
-**Grok Build** is SpaceXAI's terminal-based AI coding agent. It runs as a
-full-screen TUI that understands your codebase, edits files, executes shell
-commands, searches the web, and manages long-running tasks — interactively,
-headlessly for scripting/CI, or embedded in editors via the Agent Client
-Protocol (ACP).
+**Kiro** is a local rebrand of [SpaceXAI Grok Build](https://x.ai/cli): the same
+terminal AI coding agent, compiled so the CLI binary and display name are
+`kiro` instead of `grok`.
 
-[Installing the released binary](#installing-the-released-binary) ·
-[Building from source](#building-from-source) ·
-[Documentation](#documentation) ·
-[Repository layout](#repository-layout) ·
-[Development](#development) ·
-[Contributing](#contributing) ·
+Full-screen TUI · understands your codebase · edits files · runs shell commands ·
+web search · long-running tasks · headless / CI · Agent Client Protocol (ACP)
+
+[Install](#install) ·
+[Build from source](#build-from-source) ·
+[CI artifacts](#ci-artifacts) ·
+[Docs](#documentation) ·
+[Layout](#repository-layout) ·
+[Upstream](#upstream--maintenance) ·
 [License](#license)
 
 ![Grok Build TUI](https://media.x.ai/v1/website/universe-tui-screenshot-6f7a0837.png)
-
-**Learn more about Grok Build at [x.ai/cli](https://x.ai/cli)**
-
-This repository contains the Rust source for the `grok` CLI/TUI and its agent
-runtime. It is synced periodically from the SpaceXAI monorepo.
-
-A small `SOURCE_REV` file at the root records the full monorepo commit SHA
-for the version of the code present in this tree.
 
 </div>
 
 ---
 
-## Installing the released binary
+## What is this?
 
-Prebuilt binaries are published for macOS, Linux, and Windows:
+| | Official Grok Build | This repo (**Kiro**) |
+|--|---------------------|----------------------|
+| CLI command | `grok` | **`kiro`** |
+| Binary name | `grok` / `xai-grok-pager` | **`kiro`** |
+| Auth & API | Grok / xAI | **Same** (official endpoints) |
+| Config dir | `~/.grok` | **Same** (`~/.grok`, `$GROK_HOME`) |
+| Source | [xai-org/grok-build](https://github.com/xai-org/grok-build) | Fork: [hufans/kiro-build](https://github.com/hufans/kiro-build) |
+
+More detail for maintainers: **[KIRO.md](./KIRO.md)**.
+
+---
+
+## Install
+
+### Option A — Build from source (recommended for now)
+
+See [Build from source](#build-from-source) below, then:
 
 ```sh
-curl -fsSL https://x.ai/cli/install.sh | bash   # macOS / Linux / Git Bash
+install -m 755 target/release/kiro ~/.local/bin/kiro
+kiro --version   # e.g. kiro 0.2.112 (...)
+```
+
+### Option B — Download CI artifacts
+
+On every push/merge to `main`, GitHub Actions builds release binaries:
+
+→ [Actions · Build kiro](https://github.com/hufans/kiro-build/actions)
+
+| Artifact | Platform |
+|----------|----------|
+| `kiro-darwin-arm64` | Apple Silicon (M1/M2/M3…) |
+| `kiro-darwin-x86_64` | Intel Mac |
+| `kiro-linux-x86_64` | Linux x86_64 |
+
+```sh
+chmod +x kiro-darwin-arm64
+xattr -dr com.apple.quarantine kiro-darwin-arm64 2>/dev/null || true
+mv kiro-darwin-arm64 ~/.local/bin/kiro
+kiro --version
+```
+
+### Official `grok` (upstream installer)
+
+If you want the **official** product name and CDN installer instead of this fork:
+
+```sh
+curl -fsSL https://x.ai/cli/install.sh | bash   # macOS / Linux
 irm https://x.ai/cli/install.ps1 | iex          # Windows PowerShell
 grok --version
 ```
 
-See the [changelog](https://x.ai/build/changelog) for the latest fixes,
-features, and improvements in each release.
+That installs `grok`, not `kiro`. Config/auth still live under `~/.grok` and are
+compatible if you switch between the two.
 
-## Building from source
+---
 
-Requirements:
+## Build from source
 
-- **Rust** — the toolchain is pinned by [`rust-toolchain.toml`](rust-toolchain.toml);
-  `rustup` installs it automatically on first build.
-- **[DotSlash](https://dotslash-cli.com)** — required so hermetic tools under
-  [`bin/`](bin/) (notably [`bin/protoc`](bin/protoc)) can download and run.
-  Install it and ensure `dotslash` is on your `PATH` **before** building:
+**Requirements**
+
+- **Rust** — pinned by [`rust-toolchain.toml`](rust-toolchain.toml) (rustup installs it on first build)
+- **[DotSlash](https://dotslash-cli.com)** — for hermetic tools under [`bin/`](bin/) (e.g. [`bin/protoc`](bin/protoc)):
 
   ```sh
   cargo install dotslash
-  # or: prebuilt packages — https://dotslash-cli.com/docs/installation/
-  /usr/bin/env dotslash --help   # sanity check
+  /usr/bin/env dotslash --help
   ```
 
-- **protoc** — proto codegen resolves [`bin/protoc`](bin/protoc) via DotSlash,
-  or falls back to a `protoc` on `PATH` / `$PROTOC`.
-- macOS and Linux are supported build hosts; Windows builds are best-effort
-  and not currently tested from this tree.
+- **protoc** — via `bin/protoc` (DotSlash) or `$PROTOC` / `protoc` on `PATH`  
+  - **Intel Mac (x86_64):** repo DotSlash may not ship `macos-x86_64`; install protoc yourself (e.g. protobuf **29.3**) and set `PROTOC`.
 
 ```sh
-cargo run -p xai-grok-pager-bin              # build + launch the TUI (`kiro`)
-cargo build -p xai-grok-pager-bin --release  # release binary: target/release/kiro
-cargo check -p xai-grok-pager-bin            # fast validation
+cargo run -p xai-grok-pager-bin -- --version     # build + run
+cargo build -p xai-grok-pager-bin --release      # → target/release/kiro
+cargo check -p xai-grok-pager-bin
 ```
 
-The binary artifact is named `kiro` (crate package remains `xai-grok-pager-bin`;
-upstream/official installs use `grok`). On first launch it opens your browser to
-authenticate — see the
+On first launch, browser login uses the official Grok auth flow — see the
 [authentication guide](crates/codegen/xai-grok-pager/docs/user-guide/02-authentication.md).
+
+---
+
+## CI artifacts
+
+Workflow: [`.github/workflows/build-kiro.yml`](.github/workflows/build-kiro.yml)
+
+| Trigger | When |
+|---------|------|
+| `push` to `main` | After merge / direct push |
+| `pull_request` to `main` | PR validation |
+| `workflow_dispatch` | Manual run |
+
+Artifacts are kept for **30 days** on the Actions run page.
+
+---
 
 ## Documentation
 
-Full online documentation is available at
-[docs.x.ai/build/overview](https://docs.x.ai/build/overview).
+- Maintainer notes for this fork: **[KIRO.md](./KIRO.md)**
+- Official product docs: [docs.x.ai/build/overview](https://docs.x.ai/build/overview)
+- In-tree user guide (upstream docs, still say “grok” in places):  
+  [`crates/codegen/xai-grok-pager/docs/user-guide/`](crates/codegen/xai-grok-pager/docs/user-guide/)
 
-The user guide ships with the pager crate:
-[`crates/codegen/xai-grok-pager/docs/user-guide/`](crates/codegen/xai-grok-pager/docs/user-guide/)
-— getting started, keyboard shortcuts, slash commands, configuration, theming,
-MCP servers, skills, plugins, hooks, headless mode, sandboxing, and more.
+---
 
 ## Repository layout
 
 | Path | Contents |
 |------|----------|
-| `crates/codegen/xai-grok-pager-bin` | Composition-root package; builds the `kiro` binary |
-| `crates/codegen/xai-grok-pager` | The TUI: scrollback, prompt, modals, rendering |
-| `crates/codegen/xai-grok-shell` | Agent runtime + leader/stdio/headless entry points |
-| `crates/codegen/xai-grok-tools` | Tool implementations (terminal, file edit, search, ...) |
-| `crates/codegen/xai-grok-workspace` | Host filesystem, VCS, execution, checkpoints |
-| `crates/codegen/...` | The rest of the CLI crate closure (config, MCP, markdown, sandbox, ...) |
-| `crates/common/`, `crates/build/`, `prod/mc/` | Small shared leaf crates pulled in by the closure |
-| `third_party/` | Vendored upstream source (Mermaid diagram stack) — see below |
+| `crates/codegen/xai-grok-pager-bin` | Composition root; builds the **`kiro`** binary |
+| `crates/codegen/xai-grok-pager` | TUI: scrollback, prompt, modals, rendering |
+| `crates/codegen/xai-grok-shell` | Agent runtime + leader / stdio / headless |
+| `crates/codegen/xai-grok-tools` | Tools (terminal, file edit, search, …) |
+| `crates/codegen/xai-grok-workspace` | Host FS, VCS, execution, checkpoints |
+| `crates/codegen/...` | Config, MCP, markdown, sandbox, … |
+| `crates/common/`, `crates/build/`, `prod/mc/` | Shared leaf crates |
+| `third_party/` | Vendored Mermaid-related sources |
+| `KIRO.md` | Fork-specific maintenance guide |
 
 > [!IMPORTANT]
 > The root `Cargo.toml` (workspace members, dependency versions, lints,
 > profiles) is **generated** — treat it as read-only. Prefer editing per-crate
 > `Cargo.toml` files.
 
+---
+
 ## Development
 
 ```sh
-cargo check -p <crate>        # always target specific crates; full-workspace builds are slow
-cargo test -p xai-grok-config # per-crate tests
-cargo clippy -p <crate>       # lint config: clippy.toml at the repo root
-cargo fmt --all               # rustfmt.toml at the repo root
+cargo check -p <crate>        # prefer per-crate; full workspace is slow
+cargo test -p xai-grok-config
+cargo clippy -p <crate>
+cargo fmt --all
 ```
+
+### Git remotes (this fork)
+
+| remote | URL |
+|--------|-----|
+| `origin` | `git@github.com:hufans/kiro-build.git` |
+| `upstream` | `https://github.com/xai-org/grok-build` |
+
+```sh
+git fetch upstream
+git merge upstream/main   # or rebase; resolve kiro naming conflicts carefully
+git push origin main
+```
+
+---
+
+## Upstream & maintenance
+
+- **Upstream:** [xai-org/grok-build](https://github.com/xai-org/grok-build)  
+- **This fork:** [hufans/kiro-build](https://github.com/hufans/kiro-build)  
+- `SOURCE_REV` records the monorepo commit SHA for the synced tree.
+
+Local changes are intentionally small (binary/CLI name `kiro`) so merges from
+upstream stay manageable. See [KIRO.md](./KIRO.md).
+
+---
 
 ## Contributing
 
 > [!NOTE]
-> External contributions are not accepted. See [`CONTRIBUTING.md`](CONTRIBUTING.md).
+> This is a personal fork. Prefer issues/PRs on this repo only for **Kiro-specific**
+> packaging and branding. Upstream product contributions are not accepted here;
+> see upstream [`CONTRIBUTING.md`](CONTRIBUTING.md).
+
+---
 
 ## License
 
-First-party code in this repository is licensed under the **Apache License,
-Version 2.0** — see [`LICENSE`](LICENSE).
+First-party code is under the **Apache License, Version 2.0** — see [`LICENSE`](LICENSE).
 
-Third-party and vendored code remains under its original licenses. See:
+Third-party and vendored code remains under its original licenses:
 
-- [`THIRD-PARTY-NOTICES`](THIRD-PARTY-NOTICES) — crates.io / git dependencies,
-  bundled UI themes, and **in-tree source ports** (including openai/codex and
-  sst/opencode tool implementations)
+- [`THIRD-PARTY-NOTICES`](THIRD-PARTY-NOTICES)
 - [`crates/codegen/xai-grok-tools/THIRD_PARTY_NOTICES.md`](crates/codegen/xai-grok-tools/THIRD_PARTY_NOTICES.md)
-  — crate-local notice for the codex and opencode ports (license texts +
-  Apache §4(b) change notice)
-- [`third_party/NOTICE`](third_party/NOTICE) — vendored Mermaid-stack index
+- [`third_party/NOTICE`](third_party/NOTICE)
