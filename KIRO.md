@@ -251,46 +251,43 @@ kiro doctor             # 环境检查（可选）
 
 ---
 
-## 11. GitHub Actions 自动编译
+## 11. GitHub Actions 自动编译与一键安装
 
-工作流文件：`.github/workflows/build-kiro.yml`
+工作流文件：`.github/workflows/build-kiro.yml`  
+安装脚本：`scripts/install.sh`
+
+### 一键安装
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/hufans/kiro-build/main/scripts/install.sh | bash
+```
+
+脚本从 Release 标签 **`continuous`** 下载对应平台二进制，默认装到 `~/.local/bin/kiro`。
 
 ### 触发条件
 
 | 事件 | 说明 |
 |------|------|
-| **push → `main`** | 合并 PR 或直接 push 到 main 后自动编译 |
-| **pull_request → `main`** | 开/更新 PR 时也会编（便于合并前验证） |
-| **workflow_dispatch** | 在 Actions 页面手动点 “Run workflow” |
+| **push → `main`** | 编译三端 + 发布/更新 `continuous` Release |
+| **pull_request → `main`** | 只编译，不发 Release |
+| **workflow_dispatch** | 手动运行 |
 
 ### 产物矩阵
 
-| Artifact 名 | Runner | 适用机器 |
-|-------------|--------|----------|
+| 文件名 | Runner | 适用机器 |
+|--------|--------|----------|
 | `kiro-linux-x86_64` | `ubuntu-latest` | Linux x86_64 |
-| `kiro-darwin-arm64` | `macos-14` | Apple Silicon Mac |
+| `kiro-darwin-arm64` | `macos-14` | Apple Silicon |
 | `kiro-darwin-x86_64` | `macos-13` | Intel Mac |
 
-每次成功构建后，在对应 **Actions 运行页 → Artifacts** 下载；保留 **30 天**。
-
-### 使用步骤
-
-1. 打开 https://github.com/hufans/kiro-build/actions  
-2. 选择 **Build kiro** 工作流  
-3. 进入最新一次成功的 run  
-4. 下载对应平台的 artifact，解压后：
-   ```sh
-   chmod +x kiro-darwin-x86_64   # 或 arm64 / linux
-   mv kiro-darwin-x86_64 ~/.local/bin/kiro
-   kiro --version
-   ```
+- Actions Artifacts：保留 30 天  
+- Release：https://github.com/hufans/kiro-build/releases/tag/continuous  
 
 ### 说明
 
-- 单平台 release 编译约 **20–60+ 分钟**（首次无缓存更久；macOS 更慢）  
-- 使用 `Swatinem/rust-cache` 缓存依赖，同一分支后续会更快  
-- macOS runner 消耗 GitHub Actions 分钟数较多（免费额度有限时优先看 Linux 产物，或删掉 matrix 中不需要的系统）  
-- 若 Actions 未运行：仓库 Settings → Actions → 允许 “Allow all actions”  
+- 三端都成功才会更新 `continuous`（缺任一平台则 release job 失败）  
+- 单平台约 20–60+ 分钟；macOS 更费 Actions 额度  
+- 若安装脚本 404：等 main 上最新 Build kiro 跑完并发布 Release  
 
 ---
 

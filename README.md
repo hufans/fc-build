@@ -39,37 +39,56 @@ More detail for maintainers: **[KIRO.md](./KIRO.md)**.
 
 ## Install
 
-### Option A — Build from source (recommended for now)
+### One-line install (recommended)
 
-See [Build from source](#build-from-source) below, then:
-
-```sh
-install -m 755 target/release/kiro ~/.local/bin/kiro
-kiro --version   # e.g. kiro 0.2.112 (...)
-```
-
-### Option B — Download CI artifacts
-
-On every push/merge to `main`, GitHub Actions builds release binaries:
-
-→ [Actions · Build kiro](https://github.com/hufans/kiro-build/actions)
-
-| Artifact | Platform |
-|----------|----------|
-| `kiro-darwin-arm64` | Apple Silicon (M1/M2/M3…) |
-| `kiro-darwin-x86_64` | Intel Mac |
-| `kiro-linux-x86_64` | Linux x86_64 |
+After CI has published a **continuous** release (runs on every merge to `main`):
 
 ```sh
-chmod +x kiro-darwin-arm64
-xattr -dr com.apple.quarantine kiro-darwin-arm64 2>/dev/null || true
-mv kiro-darwin-arm64 ~/.local/bin/kiro
+curl -fsSL https://raw.githubusercontent.com/hufans/kiro-build/main/scripts/install.sh | bash
 kiro --version
 ```
 
+What it does:
+
+1. Detects OS/arch (Apple Silicon / Intel Mac / Linux x86_64)
+2. Downloads the matching binary from  
+   `https://github.com/hufans/kiro-build/releases/download/continuous/...`
+3. Installs to `~/.local/bin/kiro` (override with `KIRO_BIN_DIR`)
+
+Optional:
+
+```sh
+# custom install dir
+KIRO_BIN_DIR=$HOME/bin curl -fsSL ... | bash
+```
+
+If download fails, the `continuous` release may not exist yet — wait for the
+[Build kiro](https://github.com/hufans/kiro-build/actions) workflow to finish,
+or build from source below.
+
+### Build from source
+
+See [Build from source](#build-from-source), then:
+
+```sh
+install -m 755 target/release/kiro ~/.local/bin/kiro
+kiro --version
+```
+
+### CI artifacts (manual)
+
+→ [Actions · Build kiro](https://github.com/hufans/kiro-build/actions)  
+→ [Releases · continuous](https://github.com/hufans/kiro-build/releases/tag/continuous)
+
+| Asset | Platform |
+|-------|----------|
+| `kiro-darwin-arm64` | Apple Silicon |
+| `kiro-darwin-x86_64` | Intel Mac |
+| `kiro-linux-x86_64` | Linux x86_64 |
+
 ### Official `grok` (upstream installer)
 
-If you want the **official** product name and CDN installer instead of this fork:
+Official product name and CDN installer (not this fork):
 
 ```sh
 curl -fsSL https://x.ai/cli/install.sh | bash   # macOS / Linux
@@ -77,8 +96,7 @@ irm https://x.ai/cli/install.ps1 | iex          # Windows PowerShell
 grok --version
 ```
 
-That installs `grok`, not `kiro`. Config/auth still live under `~/.grok` and are
-compatible if you switch between the two.
+Installs `grok`, not `kiro`. Config under `~/.grok` is compatible with either.
 
 ---
 
@@ -108,17 +126,17 @@ On first launch, browser login uses the official Grok auth flow — see the
 
 ---
 
-## CI artifacts
+## CI & releases
 
 Workflow: [`.github/workflows/build-kiro.yml`](.github/workflows/build-kiro.yml)
 
 | Trigger | When |
 |---------|------|
-| `push` to `main` | After merge / direct push |
-| `pull_request` to `main` | PR validation |
+| `push` to `main` | Build all platforms + publish **`continuous`** release |
+| `pull_request` to `main` | Build only (no release) |
 | `workflow_dispatch` | Manual run |
 
-Artifacts are kept for **30 days** on the Actions run page.
+Installer script: [`scripts/install.sh`](scripts/install.sh)
 
 ---
 
