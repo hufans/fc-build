@@ -219,12 +219,18 @@ pub fn kill_process_with_signal(pid: u32, signal: KillSignal) -> std::io::Result
 }
 /// True if `pid` is a grok process; pairs with [`kill_process_by_pid`] to avoid killing a recycled PID.
 /// Best-effort on macOS/BSD (liveness-only via `kill -0`), exact on Linux (/proc cmdline) and Windows (image path).
+fn process_name_looks_like_grok_cli(name: &str) -> bool {
+    let lower = name.to_ascii_lowercase();
+    // Local rebrand installs as `kiro`; official/upstream still use `grok`.
+    lower.contains("kiro") || lower.contains("grok")
+}
+
 pub fn is_grok_process(pid: u32) -> bool {
     #[cfg(target_os = "linux")]
     {
         let cmdline_path = format!("/proc/{pid}/cmdline");
         match std::fs::read(&cmdline_path) {
-            Ok(data) => String::from_utf8_lossy(&data).contains("grok"),
+            Ok(data) => process_name_looks_like_grok_cli(&String::from_utf8_lossy(&data)),
             Err(_) => false,
         }
     }
@@ -254,9 +260,7 @@ pub fn is_grok_process(pid: u32) -> bool {
         if result.is_err() {
             return false;
         }
-        String::from_utf16_lossy(&buf[..size as usize])
-            .to_ascii_lowercase()
-            .contains("grok")
+        process_name_looks_like_grok_cli(&String::from_utf16_lossy(&buf[..size as usize]))
     }
     #[cfg(all(not(target_os = "linux"), not(windows)))]
     {
@@ -291,7 +295,7 @@ pub fn is_grok_process_strict(pid: u32) -> bool {
                     .filter(|line| !line.is_empty())
                     .and_then(|line| std::path::Path::new(line).file_name())
                     .and_then(|name| name.to_str())
-                    .is_some_and(|name| name.to_ascii_lowercase().contains("grok"))
+                    .is_some_and(process_name_looks_like_grok_cli)
             }
             _ => false,
         }
