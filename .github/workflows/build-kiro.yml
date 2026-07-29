@@ -1,0 +1,132 @@
+# Build the kiro CLI on every merge/push to main (and on PRs / manual run).
+# Artifacts are uploaded for download from the Actions run page.
+
+name: Build kiro
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: build-kiro-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  PROTOC_VERSION: "29.3"
+  RUST_BACKTRACE: "1"
+
+jobs:
+  build:
+    name: ${{ matrix.artifact }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            artifact: kiro-linux-x86_64
+            bin_name: kiro
+          - os: macos-14
+            artifact: kiro-darwin-arm64
+            bin_name: kiro
+          # Intel Mac (matches many local builds)
+          - os: macos-13
+            artifact: kiro-darwin-x86_64
+            bin_name: kiro
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install system packages (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential \
+            pkg-config \
+            libssl-dev \
+            protobuf-compiler \
+            cmake \
+            clang \
+            libclang-dev
+
+      - name: Install protoc (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          set -euo pipefail
+          case "${{ runner.arch }}" in
+            X64|x64|X86_64)
+              ZIP="protoc-${PROTOC_VERSION}-osx-x86_64.zip"
+              ;;
+            ARM64|arm64)
+              ZIP="protoc-${PROTOC_VERSION}-osx-aarch_64.zip"
+              ;;
+            *)
+              echo "Unsupported macOS arch: ${{ runner.arch }}"
+              exit 1
+              ;;
+          esac
+          curl -fsSL -o /tmp/protoc.zip \
+            "https://github.com/protocolbuffers/protobuf/releases/download/v${PROTOC_VERSION}/${ZIP}"
+          sudo unzip -o /tmp/protoc.zip -d /usr/local
+          protoc --version
+          echo "PROTOC=$(command -v protoc)" >> "$GITHUB_ENV"
+
+      - name: Set PROTOC on Linux
+        if: runner.os == 'Linux'
+        run: echo "PROTOC=$(command -v protoc)" >> "$GITHUB_ENV"
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: "1.92.0"
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: kiro-release
+          # Cache deps; still recompile the workspace on source changes.
+          cache-targets: true
+
+      - name: Build release kiro
+        run: cargo build -p xai-grok-pager-bin --release --bin kiro
+
+      - name: Smoke test
+        run: |
+          set -euo pipefail
+          BIN="target/release/${{ matrix.bin_name }}"
+          ls -lh "$BIN"
+          file "$BIN" || true
+          "$BIN" --version
+          "$BIN" --help | head -20
+
+      - name: Stage artifact
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          cp "target/release/${{ matrix.bin_name }}" "dist/${{ matrix.artifact }}"
+          chmod +x "dist/${{ matrix.artifact }}"
+          # Small metadata for the run page
+          {
+            echo "artifact=${{ matrix.artifact }}"
+            echo "os=${{ matrix.os }}"
+            echo "ref=${{ github.sha }}"
+            echo "version=$("target/release/${{ matrix.bin_name }}" --version | tr -d '\n')"
+          } > "dist/${{ matrix.artifact }}.txt"
+          ls -lh dist/
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: |
+            dist/${{ matrix.artifact }}
+            dist/${{ matrix.artifact }}.txt
+          if-no-files-found: error
+          retention-days: 30
