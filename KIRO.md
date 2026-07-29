@@ -9,7 +9,7 @@
 | 项 | 说明 |
 |----|------|
 | 上游项目 | [xai-org/grok-build](https://github.com/xai-org/grok-build)（SpaceXAI Grok Build CLI/TUI） |
-| 本仓库 | [hufans/grok-build](https://github.com/hufans/grok-build) |
+| 本仓库 | [hufans/kiro-build](https://github.com/hufans/kiro-build) |
 | 本地 CLI 名 | **`kiro`**（可执行文件、`--help`、`--version` 展示） |
 | 官方 CLI 名 | `grok`（官方安装脚本 / npm 仍使用此名） |
 | 认证与后端 | **与官方一致**（浏览器 OAuth、`cli-chat-proxy.grok.com` 等） |
@@ -26,7 +26,7 @@
 
 | remote | URL | 用途 |
 |--------|-----|------|
-| `origin` | `https://github.com/hufans/grok-build.git` | 个人 fork，日常 push |
+| `origin` | `https://github.com/hufans/kiro-build.git` | 个人 fork，日常 push |
 | `upstream` | `https://github.com/xai-org/grok-build` | 官方上游，拉取更新 |
 
 ### 2.2 关键提交（历史快照）
@@ -242,7 +242,7 @@ kiro doctor             # 环境检查（可选）
 
 ## 10. 参考链接
 
-- 本仓库：https://github.com/hufans/grok-build  
+- 本仓库：https://github.com/hufans/kiro-build  
 - 官方仓库：https://github.com/xai-org/grok-build  
 - 官方产品页：https://x.ai/cli  
 - 官方文档：https://docs.x.ai/build/overview  
@@ -275,7 +275,7 @@ kiro doctor             # 环境检查（可选）
 
 ### 使用步骤
 
-1. 打开 https://github.com/hufans/grok-build/actions  
+1. 打开 https://github.com/hufans/kiro-build/actions  
 2. 选择 **Build kiro** 工作流  
 3. 进入最新一次成功的 run  
 4. 下载对应平台的 artifact，解压后：
