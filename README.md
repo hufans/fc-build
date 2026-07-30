@@ -62,6 +62,18 @@ Optional:
 KIRO_BIN_DIR=$HOME/bin curl -fsSL ... | bash
 ```
 
+### Update in place
+
+After install (or any `kiro` binary built from this fork):
+
+```sh
+kiro update          # download latest continuous release + replace binary
+kiro update --check  # only check
+```
+
+Uses GitHub Release tag `continuous` (same assets as install.sh). Restart the
+terminal session after a successful update.
+
 If download fails, the `continuous` release may not exist yet — wait for the
 [Build kiro](https://github.com/hufans/kiro-build/actions) workflow to finish,
 or build from source below.

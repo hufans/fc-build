@@ -40,6 +40,10 @@ fn reinstall_hint(installer: &str) -> String {
     match installer {
         "npm" => "Please reinstall via npm:\n  npm i -g @xai-official/grok".to_string(),
         "gh-release" => "Please reinstall via GitHub Releases:\n  gh release download --repo xai-org-shared/grok-build --pattern 'grok-*' --output grok && chmod +x grok".to_string(),
+        "kiro" => format!(
+            "Please reinstall via:\n  curl -fsSL https://raw.githubusercontent.com/{}/main/scripts/install.sh | bash",
+            crate::kiro_installer::DEFAULT_REPO
+        ),
         _ => format!("Please reinstall via:\n  {}", manual_install_cmd()),
     }
 }
@@ -334,6 +338,9 @@ pub async fn ensure_latest_on_disk(update_config: &UpdateConfig) -> Result<Ensur
 fn disk_version_for_installer(installer: &str) -> Option<String> {
     match installer {
         "internal" | "gh-release" => crate::version::installed_on_disk_version(),
+        // kiro installs live at current_exe / ~/.local/bin/kiro; no versioned
+        // symlink layout — leave to the running binary version.
+        "kiro" => None,
         _ => None,
     }
 }
@@ -344,6 +351,7 @@ fn env_installer() -> Option<&'static str> {
             "npm" => Some("npm"),
             "internal" => Some("internal"),
             "gh-release" | "gh" => Some("gh-release"),
+            "kiro" => Some("kiro"),
             _ => None,
         };
     }
@@ -363,10 +371,16 @@ pub async fn get_installer() -> Option<&'static str> {
     if let Some(i) = env_installer() {
         return Some(i);
     }
+    // Fork binary named `kiro` always uses the kiro continuous channel — never
+    // the official x.ai CDN (which would overwrite with `grok`).
+    if crate::kiro_installer::running_as_kiro() {
+        return Some("kiro");
+    }
     let cfg = config::load_config().await;
     match cfg.cli.installer.as_deref() {
         Some("npm") => Some("npm"),
         Some("gh-release") => Some("gh-release"),
+        Some("kiro") => Some("kiro"),
         _ => Some("internal"),
     }
 }
@@ -410,7 +424,9 @@ fn needs_update(current: &str, target: &str, channel: &str, allow_downgrade: boo
 /// `get_installer()`, so they also get rollback support.
 fn installer_allows_downgrade(installer: &str) -> bool {
     match installer {
-        "internal" | "gh-release" => true,
+        // kiro continuous may keep the same package semver with a new commit
+        // (encoded as build metadata); treat inequality as an update.
+        "internal" | "gh-release" | "kiro" => true,
         "npm" => false,
         _ => false,
     }
@@ -770,6 +786,7 @@ pub async fn run_install_script(
             update_config.npm_registry.as_deref(),
         ),
         "gh-release" => install_gh_release(target).await,
+        "kiro" => crate::kiro_installer::install(target).await,
         _ => install_internal(target, update_config).await,
     };
     if result.is_ok() {
@@ -2379,17 +2396,30 @@ pub async fn run_update(
 
     heal_managed_install(installer).await;
 
-    let current_version = get_installed_grok_version();
+    let current_version = if installer == "kiro" {
+        crate::kiro_installer::running_version()
+            .await
+            .unwrap_or_else(|_| get_installed_grok_version())
+    } else {
+        get_installed_grok_version()
+    };
+    let product = if installer == "kiro" { "kiro" } else { "Grok" };
     let policy = config::VersionPolicy::resolve();
 
     // When --version is given, skip the latest-version check and install directly
     if let Some(version) = pinned_version {
+        if installer == "kiro" {
+            anyhow::bail!(
+                "kiro update uses the continuous release channel; \
+                 --version is not supported. Run `kiro update` without --version."
+            );
+        }
         if let Err(e) = crate::version_policy::check_install_target(&policy, version) {
             anyhow::bail!("{e}");
         }
         eprintln!(
-            "Installing Grok {} (current: {})...",
-            version, current_version
+            "Installing {} {} (current: {})...",
+            product, version, current_version
         );
         eprintln!();
         run_install_script(installer, Some(version), update_config).await?;
@@ -2401,8 +2431,8 @@ pub async fn run_update(
         {
             tracing::warn!("Failed to persist auto_update=false for pinned install: {e}");
         }
-        eprintln!("  ✓ grok v{} installed successfully!", version);
-        eprintln!("  Please restart Grok.");
+        eprintln!("  ✓ {product} v{version} installed successfully!");
+        eprintln!("  Please restart {product}.");
         return Ok(Some(version.to_string()));
     }
 
@@ -2514,16 +2544,16 @@ pub async fn run_update(
         .unwrap_or(true)
     {
         eprintln!(
-            "Forcing reinstall of Grok {} (already up to date)",
-            effective_current
+            "Forcing reinstall of {product} {effective_current} (already up to date)",
         );
         &effective_current
     } else {
-        eprintln!("Updating Grok {} → {}", effective_current, install_target);
+        eprintln!("Updating {product} {effective_current} → {install_target}");
         &install_target
     };
 
     eprintln!();
+    // kiro continuous ignores the version pin; still pass for API uniformity.
     run_install_script(installer, Some(target_version), update_config).await?;
     // Fetch the stable pointer now so the new binary has it immediately
     // for channel_label() display, rather than waiting for the next
@@ -2531,10 +2561,10 @@ pub async fn run_update(
     let stable_ptr = try_fetch_stable_pointer().await;
     write_version_cache(target_version, stable_ptr.as_deref()).await;
     refresh_deployment_config().await;
-    eprintln!("  ✓ grok v{} installed successfully!", target_version);
+    eprintln!("  ✓ {product} v{target_version} installed successfully!");
 
     if !force && std::env::var_os("GROK_AUTO_UPDATE").is_none() {
-        eprintln!("  Please restart Grok.");
+        eprintln!("  Please restart {product}.");
     }
     Ok(Some(target_version.to_string()))
 }

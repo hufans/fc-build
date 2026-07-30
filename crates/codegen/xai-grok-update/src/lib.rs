@@ -1,4 +1,5 @@
 pub mod auto_update;
+pub mod kiro_installer;
 pub mod version;
 mod version_policy;
 

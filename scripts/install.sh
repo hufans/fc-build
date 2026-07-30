@@ -104,6 +104,33 @@ if [ -n "$version_line" ]; then
   info "  version:   ${version_line}"
 fi
 
+# Mark this install as kiro-managed so `kiro update` uses continuous Releases
+# instead of the official x.ai CDN.
+CONFIG_FILE="${HOME}/.grok/config.toml"
+mkdir -p "${HOME}/.grok"
+if [ ! -f "$CONFIG_FILE" ]; then
+  printf '[cli]\ninstaller = "kiro"\n' > "$CONFIG_FILE"
+elif grep -q '^\[cli\]' "$CONFIG_FILE" 2>/dev/null; then
+  if grep -q '^[[:space:]]*installer[[:space:]]*=' "$CONFIG_FILE" 2>/dev/null; then
+    # replace existing installer line inside [cli] block only (best-effort)
+    tmp="${CONFIG_FILE}.tmp.$$"
+    awk '
+      /^\[cli\][[:space:]]*(#.*)?$/ { print; in_cli=1; next }
+      /^\[/ { in_cli=0 }
+      in_cli && /^[[:space:]]*installer[[:space:]]*=/ { print "installer = \"kiro\""; next }
+      { print }
+    ' "$CONFIG_FILE" > "$tmp" && mv "$tmp" "$CONFIG_FILE"
+  else
+    tmp="${CONFIG_FILE}.tmp.$$"
+    awk '
+      /^\[cli\][[:space:]]*(#.*)?$/ { print; print "installer = \"kiro\""; next }
+      { print }
+    ' "$CONFIG_FILE" > "$tmp" && mv "$tmp" "$CONFIG_FILE"
+  fi
+else
+  printf '\n[cli]\ninstaller = "kiro"\n' >> "$CONFIG_FILE"
+fi
+
 # PATH hint
 path_has_bin_dir=false
 case ":${PATH}:" in

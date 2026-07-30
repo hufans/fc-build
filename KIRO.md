@@ -46,6 +46,7 @@
 
 | 提交 | 说明 |
 |------|------|
+| *(next)* | `kiro update` 自更新：`kiro_installer` + `installer = "kiro"` |
 | *(ops)* | 手动用已编好的 arm64/linux 创建 **`continuous`** Release，解除 install 404 |
 | `2176d66` | 新增 `scripts/install.sh`；CI 在 main 构建成功后发布 **`continuous`** Release |
 | `512f216` | README 改为 **Kiro** 标题与本 fork 安装/CI 说明 |
@@ -121,6 +122,8 @@ refusing to allow an OAuth App to create or update workflow ... without workflow
 | `crates/codegen/xai-grok-pager-pty-harness/src/env.rs` | 同上 |
 | `crates/codegen/xai-grok-pager-pty-harness/src/bin/*.rs` | 注释中的 bin 名 |
 | `crates/codegen/xai-grok-shell-base/src/util/mod.rs` | `is_grok_process*` 同时认 **kiro** 与 **grok** |
+| `crates/codegen/xai-grok-update/src/kiro_installer.rs` | **新增**：`kiro update` 从 continuous Release 自更新 |
+| `crates/codegen/xai-grok-update/src/auto_update.rs` 等 | 注册 `installer = "kiro"`，避免走 x.ai CDN |
 
 ### 4.2 本 fork 独有（upstream 无对应，merge 时整文件保留）
 
@@ -181,14 +184,27 @@ install -m 755 target/release/kiro ~/.local/bin/kiro
 ### 6.1 用户侧
 
 ```sh
+# 首次安装
 curl -fsSL https://raw.githubusercontent.com/hufans/kiro-build/main/scripts/install.sh | bash
+
+# 之后更新（推荐）
+kiro update
+kiro update --check
 ```
+
+`kiro update` 由本 fork 的 **`kiro` installer** 实现（见 `crates/codegen/xai-grok-update/src/kiro_installer.rs`）：
+
+- 进程名为 `kiro`，或 `~/.grok/config.toml` 中 `installer = "kiro"`
+- 从 `continuous` Release 下载对应平台资产并替换 `current_exe` / `~/.local/bin/kiro` 等
+- **不会**走官方 `https://x.ai/cli`（避免被覆盖成 `grok`）
 
 | 环境变量 | 默认 | 含义 |
 |----------|------|------|
-| `KIRO_REPO` | `hufans/kiro-build` | GitHub 仓库 |
-| `KIRO_TAG` / `KIRO_VERSION` | `continuous` | Release 标签 |
-| `KIRO_BIN_DIR` | `~/.local/bin` | 安装目录 |
+| `KIRO_REPO` | `hufans/kiro-build` | install.sh 用的仓库 |
+| `KIRO_TAG` / `KIRO_VERSION` | `continuous` | install.sh Release 标签 |
+| `KIRO_BIN_DIR` | `~/.local/bin` | install.sh 安装目录 |
+| `KIRO_RELEASE_REPO` | `hufans/kiro-build` | `kiro update` 用的仓库 |
+| `KIRO_RELEASE_TAG` | `continuous` | `kiro update` 用的标签 |
 
 脚本逻辑摘要：
 
