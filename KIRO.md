@@ -53,7 +53,8 @@
 | `512f216` | README 改为 **Kiro** 标题与本 fork 安装/CI 说明 |
 | `e4cbe04` | 文档中的仓库链接改为 `hufans/kiro-build`（GitHub 仓库已改名） |
 | `63ff69d` | 首次加入 GitHub Actions `Build kiro`（三平台 release 编译 + Artifacts） |
-| *(next)* | 去指纹：`~/.kiro` + 从 `~/.grok` 迁移登录；`KIRO_AGENT`；安装避开 `~/.grok/bin` |
+| *(next)* | Sync upstream：无冲突直推 main + dispatch Build kiro（不再依赖开 PR） |
+| `7f33568` | 去指纹：`~/.kiro` + 从 `~/.grok` 迁移登录；`KIRO_AGENT`；安装避开 `~/.grok/bin` |
 | `0eefcc7` | 核心 rebrand：二进制 / CLI 展示名为 `kiro`；测试路径与进程识别兼容 kiro |
 
 **仓库改名（GitHub 侧，无独立 commit）：**
@@ -306,7 +307,7 @@ Actions：https://github.com/hufans/kiro-build/actions
 
 ## 8. 从官方同步
 
-### 8.1 自动同步（已配置）
+### 8.1 自动同步（已配置，24h 一次）
 
 工作流：[`.github/workflows/sync-upstream.yml`](./.github/workflows/sync-upstream.yml)  
 Actions：https://github.com/hufans/kiro-build/actions/workflows/sync-upstream.yml  
@@ -314,22 +315,49 @@ Actions：https://github.com/hufans/kiro-build/actions/workflows/sync-upstream.y
 | 触发 | 行为 |
 |------|------|
 | **每天 16:00 UTC**（约北京时间 00:00） | 检查官方是否有新提交 |
-| **手动 Run workflow** | 立刻跑一遍；可关 auto-merge |
+| **手动 Run workflow** | 立刻跑一遍；可关 auto-merge（不推 main） |
 
-流程：
+流程（无人值守）：
 
-1. `fetch` `xai-org/grok-build`  
-2. 无新提交 → 结束  
-3. 在分支 `sync/upstream` 上 merge  
-4. **无冲突** → 开/更新 PR → **自动 merge 到 main** → 尽量触发 **Build kiro** → 用户 `kiro update`  
-5. **有冲突** → 开 Issue，需人工处理  
+```text
+cron / 手动
+  → fetch xai-org/grok-build
+  → 无新提交 → 结束
+  → merge upstream/main → main
+      ├─ 无冲突 → push main → dispatch「Build kiro」→ continuous Release
+      └─ 有冲突 → 开/更新 Issue（需你本地 resolve 后 push）
+```
 
-#### 推荐配置 Secret：`SYNC_PAT`
+你不需要再开「额外的定时器」：GitHub Actions `schedule` 已经是 **每 24 小时** 一次。  
+（GitHub cron 可能延迟数十分钟到数小时，属正常现象。）
 
-默认 `GITHUB_TOKEN` 的 merge **往往不会**再触发其它 workflow。为稳定刷新 `continuous`：
+#### 仓库设置检查清单（自动流程能否跑通）
 
-1. 创建 PAT（classic：`repo` + `workflow`）  
-2. 仓库 Settings → Secrets → Actions → **`SYNC_PAT`**  
+| 项 | 期望 |
+|----|------|
+| Actions 已启用 | Settings → Actions → Allow all actions |
+| Workflow 权限 | **Read and write**（或 workflow 内 `permissions:` 能拿到 write） |
+| main 分支保护 | 建议 **不要** 挡 bot push；否则需 PAT + 放行 |
+| Secret `SYNC_PAT` | **推荐**（见下）；无也可先靠 `GITHUB_TOKEN` |
+
+#### 推荐配置 Secret：`SYNC_PAT`（提高稳定性）
+
+`GITHUB_TOKEN` 的 `git push` **不会**触发其它 workflow，因此同步脚本会 **显式** `gh workflow run "Build kiro"`。  
+加 PAT 后：权限更稳、dispatch 更可靠。
+
+1. GitHub → Settings → Developer settings → Personal access tokens  
+   - classic：`repo` + `workflow`  
+   - 或 fine-grained：本仓库 Contents/PRs/Actions/Issues 写权限  
+2. 仓库 **Settings → Secrets and variables → Actions → New repository secret**  
+3. Name：`SYNC_PAT`，Value：token  
+
+#### 曾失败的原因（2026-07-30）
+
+旧版流程依赖 **创建 PR**，在 fork 上出现：
+
+`Resource not accessible by integration (createPullRequest)`
+
+现已改为 **无冲突时直接 push main + dispatch Build kiro**，不再依赖「Actions 创建 PR」权限。  
 
 ### 8.2 手动同步
 

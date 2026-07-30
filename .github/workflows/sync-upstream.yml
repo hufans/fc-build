@@ -1,23 +1,29 @@
-# Periodically merge xai-org/grok-build into this fork.
-# - Opens (or refreshes) a PR on branch sync/upstream
-# - If the merge is clean and auto-merge is possible, merges to main
-# - Then tries to run "Build kiro" so continuous release updates
+# Periodically merge xai-org/grok-build into this fork (daily).
 #
-# Optional secret SYNC_PAT: a classic PAT (or fine-grained token) with
-# contents:write + pull-requests:write + actions:write (workflow).
-# When set, merge/push uses it so the Build kiro workflow is actually
-# triggered (GITHUB_TOKEN merges do not start new workflow runs).
+# Happy path (no conflicts):
+#   1. merge upstream/main into origin/main
+#   2. push main
+#   3. dispatch "Build kiro" → continuous Release
+#
+# Conflicts:
+#   open (or comment on) a GitHub Issue for manual fix
+#
+# Optional secret SYNC_PAT:
+#   classic PAT (repo + workflow) or fine-grained with contents/PRs/actions.
+#   Prefer setting it so pushes are attributed to you and workflow dispatch
+#   is reliable. Without it, GITHUB_TOKEN still works for push + dispatch
+#   when repo allows Actions write (no branch protection on main).
 
 name: Sync upstream
 
 on:
   schedule:
-    # 16:00 UTC daily ≈ 00:00 China time
+    # Once per day at 16:00 UTC (≈ 00:00 China time)
     - cron: "0 16 * * *"
   workflow_dispatch:
     inputs:
       auto_merge:
-        description: "Merge to main automatically when there are no conflicts"
+        description: "Push clean merge to main and trigger Build kiro"
         type: boolean
         default: true
 
@@ -33,7 +39,7 @@ permissions:
 
 jobs:
   sync:
-    name: Fetch upstream and open PR
+    name: Fetch upstream and merge
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -41,7 +47,6 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          # Prefer PAT so subsequent push/merge can trigger other workflows
           token: ${{ secrets.SYNC_PAT || secrets.GITHUB_TOKEN }}
 
       - name: Configure git
@@ -71,130 +76,88 @@ jobs:
           echo "Commits on origin not in upstream/main: $AHEAD"
           if [ "$BEHIND" -eq 0 ]; then
             echo "already_up_to_date=true" >> "$GITHUB_OUTPUT"
+            echo "### Already up to date with upstream" >> "$GITHUB_STEP_SUMMARY"
           else
             echo "already_up_to_date=false" >> "$GITHUB_OUTPUT"
             echo "### Upstream is ahead by $BEHIND commit(s)" >> "$GITHUB_STEP_SUMMARY"
             git log --oneline origin/main..upstream/main | head -30 >> "$GITHUB_STEP_SUMMARY" || true
           fi
 
-      - name: Merge upstream into sync branch
+      - name: Merge upstream into main
         if: steps.status.outputs.already_up_to_date != 'true'
         id: merge
         run: |
           set -euo pipefail
-          BRANCH="sync/upstream"
-          git checkout -B "$BRANCH" origin/main
+          git checkout -B main origin/main
 
           if git merge upstream/main -m "chore: sync from upstream $(date -u +%Y-%m-%d)
 
           Merge xai-org/grok-build main into this fork.
-          Keep kiro branding / install / CI patches on conflict.
+          Keep kiro branding / install / CI / ~/.kiro patches on conflict.
           "; then
             echo "conflict=false" >> "$GITHUB_OUTPUT"
             echo "Merge clean."
+            echo "head=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
           else
             echo "conflict=true" >> "$GITHUB_OUTPUT"
             git merge --abort || true
             echo "Merge has conflicts — needs manual resolution."
-            # Still push base branch tip for a draft PR? Better open an issue.
+            # Do not fail the job; the issue step will notify.
             exit 0
           fi
 
-          git push -u origin "$BRANCH" --force-with-lease
-
-      - name: Open or update pull request
-        if: steps.status.outputs.already_up_to_date != 'true' && steps.merge.outputs.conflict != 'true'
-        id: pr
-        env:
-          GH_TOKEN: ${{ secrets.SYNC_PAT || secrets.GITHUB_TOKEN }}
-        run: |
-          set -euo pipefail
-          BRANCH="sync/upstream"
-          BEHIND="${{ steps.status.outputs.behind }}"
-          TITLE="chore: sync ${BEHIND} commit(s) from upstream"
-          BODY="$(cat <<EOF
-          ## Automated upstream sync
-
-          Merges \`xai-org/grok-build\` (\`upstream/main\`) into this fork.
-
-          - Commits behind upstream: **${BEHIND}**
-          - Opened by workflow: Sync upstream
-          - Date (UTC): $(date -u +%Y-%m-%dT%H:%MZ)
-
-          ### After merge
-          - CI **Build kiro** should publish a new \`continuous\` release
-          - Users can run \`kiro update\`
-
-          ### If this PR has kiro-related conflicts later
-          Prefer keeping this fork's branding / \`scripts/install.sh\` / workflows / \`KIRO.md\`.
-          See [KIRO.md](../blob/main/KIRO.md).
-          EOF
-          )"
-
-          EXISTING=$(gh pr list --head "$BRANCH" --base main --state open --json number --jq '.[0].number // empty')
-          if [ -n "$EXISTING" ]; then
-            echo "Updating existing PR #$EXISTING"
-            gh pr edit "$EXISTING" --title "$TITLE" --body "$BODY"
-            echo "number=$EXISTING" >> "$GITHUB_OUTPUT"
-          else
-            URL=$(gh pr create --base main --head "$BRANCH" --title "$TITLE" --body "$BODY")
-            echo "Created $URL"
-            NUMBER=$(echo "$URL" | grep -oE '[0-9]+$')
-            echo "number=$NUMBER" >> "$GITHUB_OUTPUT"
-          fi
-
-      - name: Auto-merge when clean
+      - name: Push main when clean
         if: >-
           steps.status.outputs.already_up_to_date != 'true'
           && steps.merge.outputs.conflict != 'true'
           && (github.event_name != 'workflow_dispatch' || inputs.auto_merge)
-        env:
-          GH_TOKEN: ${{ secrets.SYNC_PAT || secrets.GITHUB_TOKEN }}
+        id: push
         run: |
           set -euo pipefail
-          NUM="${{ steps.pr.outputs.number }}"
-          if [ -z "$NUM" ]; then
-            echo "No PR number; skip merge"
-            exit 0
-          fi
-          # Enable auto-merge (merge commit) then merge immediately if allowed
-          gh pr merge "$NUM" --merge --delete-branch=false || {
-            echo "Direct merge failed; enabling auto-merge when checks pass..."
-            gh pr merge "$NUM" --auto --merge || true
-          }
-          echo "PR #$NUM merge attempted."
+          git push origin main
+          echo "pushed=true" >> "$GITHUB_OUTPUT"
+          echo "### Pushed merge to main (\`${{ steps.merge.outputs.head }}\`)" >> "$GITHUB_STEP_SUMMARY"
 
-      - name: Trigger Build kiro after merge
+      - name: Keep sync/upstream branch as mirror (optional audit)
         if: >-
           steps.status.outputs.already_up_to_date != 'true'
           && steps.merge.outputs.conflict != 'true'
-          && (github.event_name != 'workflow_dispatch' || inputs.auto_merge)
+          && steps.push.outputs.pushed == 'true'
+        continue-on-error: true
+        run: |
+          set -euo pipefail
+          git branch -f sync/upstream main
+          git push -u origin sync/upstream --force-with-lease || true
+
+      - name: Trigger Build kiro after clean push
+        if: >-
+          steps.status.outputs.already_up_to_date != 'true'
+          && steps.merge.outputs.conflict != 'true'
+          && steps.push.outputs.pushed == 'true'
         env:
           GH_TOKEN: ${{ secrets.SYNC_PAT || secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          # Wait briefly for main to advance if merge just completed
-          sleep 5
-          git fetch origin main
-          # Only dispatch if main already contains upstream tip (merge landed)
-          if git merge-base --is-ancestor upstream/main origin/main; then
-            echo "main includes upstream; dispatching Build kiro"
-            gh workflow run "Build kiro" --ref main || true
+          # GITHUB_TOKEN pushes do not start other workflows; always dispatch.
+          # SYNC_PAT pushes also dispatch as a belt-and-suspenders (in case the
+          # push event is delayed or filtered).
+          sleep 3
+          if gh workflow run "Build kiro" --ref main; then
+            echo "Dispatched Build kiro on main"
+            echo "### Dispatched **Build kiro**" >> "$GITHUB_STEP_SUMMARY"
           else
-            echo "main does not yet include upstream (PR may be waiting on checks)."
-            echo "Merge the sync PR manually if needed, then Build kiro will run on push"
-            echo "(or re-run this workflow after merge)."
+            echo "::warning::Failed to dispatch Build kiro — check Actions permissions / SYNC_PAT"
+            exit 1
           fi
 
       - name: File issue when merge conflicts
         if: steps.status.outputs.already_up_to_date != 'true' && steps.merge.outputs.conflict == 'true'
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.SYNC_PAT || secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
           BEHIND="${{ steps.status.outputs.behind }}"
           TITLE="Upstream sync needs manual merge (${BEHIND} commits)"
-          # Avoid duplicate open issues with same title prefix
           EXISTING=$(gh issue list --state open --search "Upstream sync needs manual merge in:title" --json number --jq '.[0].number // empty')
           BODY="$(cat <<EOF
           Automated **Sync upstream** could not merge \`upstream/main\` cleanly.
@@ -208,9 +171,11 @@ jobs:
           git checkout main
           git pull origin main
           git merge upstream/main
-          # resolve conflicts (keep kiro branding / install / CI)
+          # resolve conflicts (keep kiro branding / install / CI / ~/.kiro)
           git push origin main
           \`\`\`
+
+          After push, **Build kiro** should refresh the \`continuous\` Release.
 
           See [KIRO.md](https://github.com/${{ github.repository }}/blob/main/KIRO.md).
           EOF
@@ -221,3 +186,4 @@ jobs:
           else
             gh issue create --title "$TITLE" --body "$BODY"
           fi
+          echo "### ⚠️ Conflicts — opened/updated Issue" >> "$GITHUB_STEP_SUMMARY"
