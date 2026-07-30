@@ -54,7 +54,13 @@ esac
 # Match CI artifact names in .github/workflows/build-kiro.yml
 case "${os_name}-${arch_name}" in
   darwin-arm64)  artifact="kiro-darwin-arm64" ;;
-  darwin-x86_64) artifact="kiro-darwin-x86_64" ;;
+  darwin-x86_64)
+    die "Intel Mac (x86_64) binaries are not published in continuous releases yet.
+  Build from source on this machine:
+    git clone https://github.com/${REPO}.git && cd kiro-build
+    cargo build -p xai-grok-pager-bin --release --bin kiro
+    install -m 755 target/release/kiro ~/.local/bin/kiro"
+    ;;
   linux-x86_64)  artifact="kiro-linux-x86_64" ;;
   linux-arm64)   die "linux arm64 builds are not published yet" ;;
   *)             die "no binary for ${os_name}-${arch_name}" ;;

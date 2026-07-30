@@ -34,10 +34,8 @@ jobs:
           - os: macos-14
             artifact: kiro-darwin-arm64
             bin_name: kiro
-          # Intel Mac (matches many local builds)
-          - os: macos-13
-            artifact: kiro-darwin-x86_64
-            bin_name: kiro
+          # macos-13 (Intel) free runners often queue for hours and block
+          # the continuous release. Build Intel locally or re-add later.
 
     steps:
       - name: Checkout
@@ -132,11 +130,11 @@ jobs:
           retention-days: 30
 
   # Publish a rolling "continuous" release so install.sh can curl a stable URL.
-  # Only on push to main (not PRs).
+  # Only on push to main (not PRs). Publishes whatever platforms built successfully.
   release:
     name: Publish continuous release
     needs: build
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.build.result == 'success'
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -147,31 +145,47 @@ jobs:
           path: artifacts
 
       - name: Stage release assets
+        id: stage
         run: |
           set -euo pipefail
           mkdir -p dist
-          # artifacts/<name>/<files>
           for dir in artifacts/*/; do
             [ -d "$dir" ] || continue
             find "$dir" -type f -maxdepth 1 \( -name 'kiro-*' ! -name '*.txt' \) -exec cp -f {} dist/ \;
           done
-          ls -lh dist/
-          # Require all three platforms for a complete install matrix
-          for need in kiro-linux-x86_64 kiro-darwin-arm64 kiro-darwin-x86_64; do
-            test -f "dist/$need" || { echo "missing $need"; exit 1; }
-            chmod +x "dist/$need"
+          ls -lh dist/ || true
+          count=0
+          files=()
+          for f in dist/kiro-*; do
+            [ -f "$f" ] || continue
+            chmod +x "$f"
+            files+=("$f")
+            count=$((count + 1))
+          done
+          if [ "$count" -eq 0 ]; then
+            echo "No kiro binaries to publish"
+            exit 1
+          fi
+          # Primary platforms should be present for a healthy release
+          for need in kiro-linux-x86_64 kiro-darwin-arm64; do
+            test -f "dist/$need" || { echo "missing required $need"; exit 1; }
           done
           {
             echo "Kiro continuous build"
             echo
             echo "- commit: \`${{ github.sha }}\`"
             echo "- run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+            echo "- assets:"
+            for f in "${files[@]}"; do
+              echo "  - \`$(basename "$f")\`"
+            done
             echo
             echo "Install:"
             echo '```sh'
             echo "curl -fsSL https://raw.githubusercontent.com/${{ github.repository }}/main/scripts/install.sh | bash"
             echo '```'
           } > dist/RELEASE_NOTES.md
+          echo "count=$count" >> "$GITHUB_OUTPUT"
 
       - name: Create / update continuous release
         uses: softprops/action-gh-release@v2
@@ -179,10 +193,7 @@ jobs:
           tag_name: continuous
           name: Kiro continuous
           body_path: dist/RELEASE_NOTES.md
-          files: |
-            dist/kiro-linux-x86_64
-            dist/kiro-darwin-arm64
-            dist/kiro-darwin-x86_64
+          files: dist/kiro-*
           fail_on_unmatched_files: true
           make_latest: true
         env:

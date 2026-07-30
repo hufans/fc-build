@@ -46,6 +46,7 @@
 
 | 提交 | 说明 |
 |------|------|
+| *(ops)* | 手动用已编好的 arm64/linux 创建 **`continuous`** Release，解除 install 404 |
 | `2176d66` | 新增 `scripts/install.sh`；CI 在 main 构建成功后发布 **`continuous`** Release |
 | `512f216` | README 改为 **Kiro** 标题与本 fork 安装/CI 说明 |
 | `e4cbe04` | 文档中的仓库链接改为 `hufans/kiro-build`（GitHub 仓库已改名） |
@@ -203,11 +204,11 @@ curl -fsSL https://raw.githubusercontent.com/hufans/kiro-build/main/scripts/inst
 
 ```text
 push main
-  → matrix 编译三端（Artifacts）
+  → matrix 编译（linux-x86_64 + darwin-arm64 Artifacts）
   → 全部成功
   → softprops/action-gh-release
   → tag: continuous（make_latest）
-  → assets: kiro-linux-x86_64, kiro-darwin-arm64, kiro-darwin-x86_64
+  → assets: kiro-linux-x86_64, kiro-darwin-arm64
 ```
 
 Release 页：https://github.com/hufans/kiro-build/releases/tag/continuous  
@@ -244,8 +245,8 @@ Actions：https://github.com/hufans/kiro-build/actions
 |-------------------------|--------|----------|
 | `kiro-linux-x86_64` | `ubuntu-latest` | Linux x86_64 |
 | `kiro-darwin-arm64` | `macos-14` | **Apple Silicon** |
-| `kiro-darwin-x86_64` | `macos-13` | Intel Mac |
 
+- **已移除** `macos-13` / `kiro-darwin-x86_64`：免费 runner 常排队数小时，曾导致 `continuous` 永远不发版、install 404  
 - 超时：120 分钟/job  
 - 缓存：`Swatinem/rust-cache`（`shared-key: kiro-release`）  
 - protoc：Linux apt；macOS 下载官方 zip 29.3  
@@ -253,8 +254,8 @@ Actions：https://github.com/hufans/kiro-build/actions
 
 ### 7.3 费用与优化
 
-- macOS 分钟数贵；额度紧时可删掉 matrix 中某一行（同时改 `install.sh` 与 release 必选文件列表）
-- 文档-only 改动也会触发全量编译（可后续加 `paths-ignore`）
+- macOS 分钟数贵；文档-only 改动也会触发全量编译（可后续加 `paths-ignore`）
+- 紧急发版：`gh release upload continuous --clobber <binary>`（2026-07-30 曾用手搓 arm64/linux 解 404）
 
 ---
 
@@ -296,10 +297,10 @@ cargo build -p xai-grok-pager-bin --release --bin kiro
 
 | 平台 | 支持情况 |
 |------|----------|
-| macOS arm64 | CI + install.sh |
-| macOS x86_64 | CI + install.sh |
-| Linux x86_64 | CI + install.sh |
-| Linux arm64 | **未发布**（install 会报错） |
+| macOS arm64 | CI + install.sh ✅ |
+| macOS x86_64 | **不发布**；本机 `cargo build` |
+| Linux x86_64 | CI + install.sh ✅ |
+| Linux arm64 | **未发布** |
 | Windows | **未做** fork CI；可用官方 `install.ps1` 装 grok |
 
 未签名：macOS 可能提示无法验证开发者；`xattr -dr com.apple.quarantine` 或系统设置允许。
@@ -321,7 +322,7 @@ cargo build -p xai-grok-pager-bin --release --bin kiro
 
 # Release 是否齐全
 # 打开 https://github.com/hufans/kiro-build/releases/tag/continuous
-# 应有三个 kiro-* 文件
+# 应有 kiro-darwin-arm64 与 kiro-linux-x86_64
 ```
 
 ---
@@ -330,12 +331,14 @@ cargo build -p xai-grok-pager-bin --release --bin kiro
 
 | 现象 | 可能原因 | 处理 |
 |------|----------|------|
-| install 404 / HTML | 尚无 `continuous` 或 CI 失败 | 看 Actions；等三端成功；或源码编译 |
+| install 404 / HTML | 尚无 `continuous` 或 CI 失败 | 看 [Releases](https://github.com/hufans/kiro-build/releases)；等 CI；或源码编译 |
+| install 404（历史） | Intel job 排队卡住，release 永不跑 | 已去掉 macos-13；已手搓 continuous |
+| Intel Mac install 拒绝 | 故意不发 x86_64 包 | 本机编译安装 |
 | install 下载后无法执行 | 架构下错 / 坏文件 | 对照 `uname -m`；重装；看 `--version` |
 | `kiro: command not found` | PATH 无 `~/.local/bin` | 按脚本提示写 zshrc/bashrc |
 | Intel Mac 编不过 protoc | DotSlash 无 x86_64 | 自备 protoc + `PROTOC` |
 | push workflow 被拒 | OAuth 无 workflow scope | 用 SSH origin |
-| continuous 未更新 | 某一 matrix job 失败 | 修失败 job；`fail-fast: false` 时其它端可能仍绿但 release 不发 |
+| continuous 未更新 | matrix 失败 | 修失败 job；可 `gh release upload continuous --clobber` |
 | merge upstream 大量冲突 | 改动面扩大 | 控制在 §4.1；不要全库 rename |
 
 ---

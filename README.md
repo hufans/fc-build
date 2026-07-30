@@ -82,9 +82,10 @@ kiro --version
 
 | Asset | Platform |
 |-------|----------|
-| `kiro-darwin-arm64` | Apple Silicon |
-| `kiro-darwin-x86_64` | Intel Mac |
+| `kiro-darwin-arm64` | Apple Silicon (M1/M2/M3…) |
 | `kiro-linux-x86_64` | Linux x86_64 |
+
+Intel Mac: build from source (CI does not publish x86_64 macOS assets by default).
 
 ### Official `grok` (upstream installer)
 
