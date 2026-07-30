@@ -278,22 +278,41 @@ Actions：https://github.com/hufans/kiro-build/actions
 
 ## 8. 从官方同步
 
+### 8.1 自动同步（已配置）
+
+工作流：[`.github/workflows/sync-upstream.yml`](./.github/workflows/sync-upstream.yml)  
+Actions：https://github.com/hufans/kiro-build/actions/workflows/sync-upstream.yml  
+
+| 触发 | 行为 |
+|------|------|
+| **每天 16:00 UTC**（约北京时间 00:00） | 检查官方是否有新提交 |
+| **手动 Run workflow** | 立刻跑一遍；可关 auto-merge |
+
+流程：
+
+1. `fetch` `xai-org/grok-build`  
+2. 无新提交 → 结束  
+3. 在分支 `sync/upstream` 上 merge  
+4. **无冲突** → 开/更新 PR → **自动 merge 到 main** → 尽量触发 **Build kiro** → 用户 `kiro update`  
+5. **有冲突** → 开 Issue，需人工处理  
+
+#### 推荐配置 Secret：`SYNC_PAT`
+
+默认 `GITHUB_TOKEN` 的 merge **往往不会**再触发其它 workflow。为稳定刷新 `continuous`：
+
+1. 创建 PAT（classic：`repo` + `workflow`）  
+2. 仓库 Settings → Secrets → Actions → **`SYNC_PAT`**  
+
+### 8.2 手动同步
+
 ```sh
-cd /path/to/kiro-build   # 本地克隆路径可能仍叫 grok-build，无妨
+cd /path/to/kiro-build
 git fetch upstream
+git checkout main && git pull origin main
 git merge upstream/main
-# 或：git rebase upstream/main
-
-# 冲突时：
-#   - §4.1 文件 → 保留 kiro 命名
-#   - README.md → 保留本 fork 版或手工合并
-#   - 独有文件 §4.2 → 勿删
-
+# 冲突：§4.1 保留 kiro；§4.2 独有文件勿删
 git push origin main
-# 等 CI 绿了，continuous 自动更新
 ```
-
-可选：同步后本地再编一次自测：
 
 ```sh
 cargo build -p xai-grok-pager-bin --release --bin kiro
