@@ -46,6 +46,7 @@
 
 | 提交 | 说明 |
 |------|------|
+| *(next)* | Actions **Sync upstream**：定时 merge 官方并开 PR / 自动合入 |
 | *(next)* | `kiro update` 自更新：`kiro_installer` + `installer = "kiro"` |
 | *(ops)* | 手动用已编好的 arm64/linux 创建 **`continuous`** Release，解除 install 404 |
 | `2176d66` | 新增 `scripts/install.sh`；CI 在 main 构建成功后发布 **`continuous`** Release |

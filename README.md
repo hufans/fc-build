@@ -205,6 +205,8 @@ git merge upstream/main   # or rebase; resolve kiro naming conflicts carefully
 git push origin main
 ```
 
+**Automated:** workflow [Sync upstream](https://github.com/hufans/kiro-build/actions/workflows/sync-upstream.yml) runs daily and can open/merge a PR from `xai-org/grok-build`. See [KIRO.md §8](./KIRO.md). Optional secret `SYNC_PAT` improves CI triggering after auto-merge.
+
 ---
 
 ## Upstream & maintenance
