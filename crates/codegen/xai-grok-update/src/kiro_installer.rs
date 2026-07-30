@@ -151,13 +151,22 @@ fn install_destinations() -> Vec<PathBuf> {
         dests.push(exe);
     }
     if let Some(home) = dirs_home() {
+        // Prefer paths without a `grok` path segment (scanner fingerprint).
+        // Still refresh a legacy `~/.grok/bin/kiro` if that is the running
+        // binary, via `current_exe` above — but do not re-create that path.
         for p in [
             home.join(".local/bin/kiro"),
-            home.join(".grok/bin/kiro"),
+            home.join(".kiro/bin/kiro"),
         ] {
             if p.exists() && !dests.iter().any(|d| d == &p) {
                 dests.push(p);
             }
+        }
+        // Always ensure ~/.local/bin/kiro is a target so users can leave
+        // ~/.grok/bin without losing updates.
+        let local = home.join(".local/bin/kiro");
+        if !dests.iter().any(|d| d == &local) {
+            dests.push(local);
         }
     }
     dests

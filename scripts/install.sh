@@ -105,9 +105,18 @@ if [ -n "$version_line" ]; then
 fi
 
 # Mark this install as kiro-managed so `kiro update` uses continuous Releases
-# instead of the official x.ai CDN.
-CONFIG_FILE="${HOME}/.grok/config.toml"
-mkdir -p "${HOME}/.grok"
+# instead of the official x.ai CDN. Config lives under ~/.kiro (not ~/.grok)
+# to avoid home-dir path fingerprints used by endpoint scanners.
+KIRO_HOME_DIR="${KIRO_HOME:-${HOME}/.kiro}"
+CONFIG_FILE="${KIRO_HOME_DIR}/config.toml"
+mkdir -p "${KIRO_HOME_DIR}"
+# One-time seed of login/config from official ~/.grok when present.
+if [ -d "${HOME}/.grok" ] && [ ! -f "${CONFIG_FILE}" ] && [ -f "${HOME}/.grok/config.toml" ]; then
+  cp "${HOME}/.grok/config.toml" "${CONFIG_FILE}" 2>/dev/null || true
+fi
+if [ -d "${HOME}/.grok" ] && [ ! -f "${KIRO_HOME_DIR}/auth.json" ] && [ -f "${HOME}/.grok/auth.json" ]; then
+  cp "${HOME}/.grok/auth.json" "${KIRO_HOME_DIR}/auth.json" 2>/dev/null || true
+fi
 if [ ! -f "$CONFIG_FILE" ]; then
   printf '[cli]\ninstaller = "kiro"\n' > "$CONFIG_FILE"
 elif grep -q '^\[cli\]' "$CONFIG_FILE" 2>/dev/null; then

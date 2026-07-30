@@ -2877,6 +2877,7 @@ fn login_env_var_excluded(key: &str) -> bool {
             | "_"
             | "TERM"
             | "GROK_AGENT"
+            | "KIRO_AGENT"
             | "SUDO_ASKPASS"
             | "GROK_ASKPASS"
             | "ELECTRON_RUN_AS_NODE"

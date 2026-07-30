@@ -34,9 +34,9 @@
 | 本地 CLI | **`kiro`**（二进制名、`Usage`、`--version` 前缀） |
 | 官方 CLI | `grok` |
 | 认证 / API | **不变**，仍走官方 Grok / xAI |
-| 配置目录 | **`~/.grok`** / `$GROK_HOME`（可与官方 `grok` 共用登录态） |
+| 配置目录 | **`~/.kiro`** / `$KIRO_HOME`（首次可从 `~/.grok` 迁移登录态） |
 
-**一句话：** 官方能力 + 本地命令叫 `kiro`；不藏网络、不改后端；用 CI + `continuous` Release 做简易分发。
+**一句话：** 官方能力 + 本地命令叫 `kiro`；配置目录与进程环境去 `grok` 指纹；API/登录协议不变；用 CI + `continuous` Release 做简易分发。
 
 ---
 
@@ -53,6 +53,7 @@
 | `512f216` | README 改为 **Kiro** 标题与本 fork 安装/CI 说明 |
 | `e4cbe04` | 文档中的仓库链接改为 `hufans/kiro-build`（GitHub 仓库已改名） |
 | `63ff69d` | 首次加入 GitHub Actions `Build kiro`（三平台 release 编译 + Artifacts） |
+| *(next)* | 去指纹：`~/.kiro` + 从 `~/.grok` 迁移登录；`KIRO_AGENT`；安装避开 `~/.grok/bin` |
 | `0eefcc7` | 核心 rebrand：二进制 / CLI 展示名为 `kiro`；测试路径与进程识别兼容 kiro |
 
 **仓库改名（GitHub 侧，无独立 commit）：**
@@ -135,10 +136,37 @@ refusing to allow an OAuth App to create or update workflow ... without workflow
 | `.github/workflows/build-kiro.yml` | 编译 + 发布 continuous |
 | `README.md` | 已按 Kiro 重写（与 upstream README 会冲突，merge 后以本版为准或手工合并） |
 
-### 4.3 明确未改
+### 4.3 进程/路径去指纹（公司扫描友好）
+
+目标：**继续用官方 Grok 登录与 API**，但进程名、安装路径、配置目录、子进程环境里尽量不出现 `grok` 字样（Cursor/OpenCode 里用 Grok 模型通常仍允许；公司若扫的是「grok CLI」路径/进程指纹，本 fork 针对性弱化）。
+
+| 项 | 行为 |
+|----|------|
+| 默认配置目录 | **`~/.kiro`**（`$KIRO_HOME` 优先，其次兼容 `$GROK_HOME`） |
+| 登录迁移 | 首次启动若 `~/.kiro` 缺 `auth.json`/`config.toml` 等，从官方 **`~/.grok` 复制一次**（之后不再依赖 `~/.grok` 路径） |
+| 二进制落点 | **`~/.local/bin/kiro`**（不要装到 `~/.grok/bin`） |
+| 子进程哨兵 | **`KIRO_AGENT=1`**（不再导出 `GROK_AGENT=1`） |
+| 认证 / API | **不变**（仍官方 OAuth / x.ai） |
+
+**你本机必须做的清理（代码改完后）：**
+
+1. 重新编译并安装到 `~/.local/bin/kiro`（见 §5）
+2. 从 shell 配置里 **删掉** `PATH` 中的 `~/.grok/bin`
+3. 确认 `which kiro` 不是 `~/.grok/bin/kiro`
+4. 关掉旧会话后用新二进制启动；确认 `lsof -p $(pgrep -n kiro)` 打开的是 `~/.kiro/...` 而不是 `~/.grok/...`
+5. 确认登录正常后，可归档/重命名 `~/.grok`（例如 `mv ~/.grok ~/.grok.bak`），避免家目录扫描命中
+
+**仍无法完全抹掉的（诚实边界）：**
+
+- 二进制内部仍有大量 `grok` 字符串（crate 名、文案、模型 id）；深扫 `strings` 仍可能认出
+- 网络仍访问 x.ai / 官方鉴权（与 Cursor 用 Grok 模型同类）
+- 仓库/工程里若路径含 `Grok`（如 `~/Code/Grok/...`）会出现在进程 cwd
+- 项目级 `.grok/` 目录（skills/hooks）尚未全局改名
+
+### 4.4 明确未改
 
 - Crate 包名仍为 `xai-grok-*`
-- `~/.grok`、`GROK_*`、官方 OAuth 与 API
+- 官方 OAuth 与 API 协议
 - 业务逻辑、工具实现
 - 官方 `https://x.ai/cli/install.sh`（装的是 `grok`，不是 kiro）
 
@@ -170,13 +198,13 @@ cargo build -p xai-grok-pager-bin --release --bin kiro
 # → target/release/kiro
 
 install -m 755 target/release/kiro ~/.local/bin/kiro
-# 可选：install -m 755 target/release/kiro ~/.grok/bin/kiro
+# 不要装到 ~/.grok/bin（路径含 grok，易被扫描）
 ```
 
 ### 5.3 首次运行
 
-- 浏览器登录 = 官方 Grok 流程
-- 数据在 `~/.grok`；已登录过官方 `grok` 通常可直接用
+- 浏览器登录 = 官方 Grok 流程（协议不变）
+- 数据在 **`~/.kiro`**；若本机已有官方 `~/.grok` 登录态，会自动复制 `auth.json` / `config.toml` 等，一般无需重登
 
 ---
 

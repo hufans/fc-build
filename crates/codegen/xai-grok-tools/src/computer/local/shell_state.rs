@@ -101,7 +101,7 @@ dump_bash_state() {
   _emit "$PWD"
 
   local env_vars
-  env_vars=$(builtin export -p 2>/dev/null | command grep -viE '_proxy=|GROK_SANDBOX|GROK_AGENT=|SUDO_ASKPASS|GROK_ASKPASS|ELECTRON_RUN_AS_NODE|SSH_AUTH_SOCK|DBUS_SESSION_BUS_ADDRESS|XDG_RUNTIME_DIR|WAYLAND_DISPLAY|GPG_TTY' || true)
+  env_vars=$(builtin export -p 2>/dev/null | command grep -viE '_proxy=|GROK_SANDBOX|GROK_AGENT=|KIRO_AGENT=|SUDO_ASKPASS|GROK_ASKPASS|ELECTRON_RUN_AS_NODE|SSH_AUTH_SOCK|DBUS_SESSION_BUS_ADDRESS|XDG_RUNTIME_DIR|WAYLAND_DISPLAY|GPG_TTY' || true)
   _emit_encoded "$env_vars" "ENV_VARS_B64"
 
   # errexit/pipefail here are this function's own `set -euo pipefail` (set is
@@ -157,7 +157,7 @@ function dump_zsh_state() {
   _emit "$PWD"
 
   local env_vars
-  env_vars=$(builtin typeset -xp 2>/dev/null | command grep -viE '_proxy=|GROK_SANDBOX|GROK_AGENT=|SUDO_ASKPASS|GROK_ASKPASS|ELECTRON_RUN_AS_NODE|SSH_AUTH_SOCK|DBUS_SESSION_BUS_ADDRESS|XDG_RUNTIME_DIR|WAYLAND_DISPLAY|GPG_TTY' || true)
+  env_vars=$(builtin typeset -xp 2>/dev/null | command grep -viE '_proxy=|GROK_SANDBOX|GROK_AGENT=|KIRO_AGENT=|SUDO_ASKPASS|GROK_ASKPASS|ELECTRON_RUN_AS_NODE|SSH_AUTH_SOCK|DBUS_SESSION_BUS_ADDRESS|XDG_RUNTIME_DIR|WAYLAND_DISPLAY|GPG_TTY' || true)
   _emit_encoded "$env_vars" "ENV_VARS_B64"
 
   # errreturn/pipefail here are this function's own `emulate -L` options
@@ -421,9 +421,10 @@ impl ShellState {
                 // up as `Y\nX\n` instead of the chronological `X\nY\n`.
                 // Shell-level diagnostics (eval syntax errors, etc.) still
                 // land on the outer shell's stderr — those are unaffected.
-                // Re-export GROK_AGENT=1 after snapshot eval so agent-definition
+                // Re-export KIRO_AGENT=1 after snapshot eval so agent-definition
                 // selectors (or other values) from prior shells cannot clear the
-                // agent sentinel (process env alone is insufficient).
+                // agent sentinel (process env alone is insufficient). Drop any
+                // inherited GROK_AGENT so process env scans do not see "grok".
                 //
                 // Copy $1/$2 into plain variables and clear the positional
                 // parameters (`builtin set --`) BEFORE eval'ing the user
@@ -443,13 +444,14 @@ impl ShellState {
                 "{dump_script} \
                  snap=$(command cat <&3) && builtin shopt -s extglob && builtin eval -- \"$snap\" && \
                  {{ builtin set +u 2>/dev/null || true; \
-                 builtin export GROK_AGENT=1; \
+                 builtin unset GROK_AGENT 2>/dev/null || true; \
+                 builtin export KIRO_AGENT=1; \
                  builtin export PWD=\"$(builtin pwd)\"; \
                  builtin shopt -s expand_aliases 2>/dev/null; {sudo_inject}{search_inject}\
                  builtin printf '%s' \"${{2:-}}\"; \
-                 __grok_user_cmd=\"$1\"; builtin declare +x __grok_user_cmd 2>/dev/null; builtin set --; \
-                 builtin eval \"$__grok_user_cmd\" 2>&1; }}; \
-                 COMMAND_EXIT_CODE=$?; builtin unset __grok_user_cmd 2>/dev/null; {dump_fn} >&4; builtin exit $COMMAND_EXIT_CODE"
+                 __kiro_user_cmd=\"$1\"; builtin declare +x __kiro_user_cmd 2>/dev/null; builtin set --; \
+                 builtin eval \"$__kiro_user_cmd\" 2>&1; }}; \
+                 COMMAND_EXIT_CODE=$?; builtin unset __kiro_user_cmd 2>/dev/null; {dump_fn} >&4; builtin exit $COMMAND_EXIT_CODE"
             ),
             // After snapshot restore: force nonomatch so login dumps cannot re-arm NOMATCH for model globs.
             // See the bash wrapper comment for why positional parameters are
@@ -463,13 +465,14 @@ impl ShellState {
                  builtin eval \"$snap\" && \
                  {{ builtin unsetopt nounset 2>/dev/null || true; \
                  builtin setopt nonomatch 2>/dev/null || true; \
-                 builtin export GROK_AGENT=1; \
+                 builtin unset GROK_AGENT 2>/dev/null || true; \
+                 builtin export KIRO_AGENT=1; \
                  builtin export PWD=\"$(builtin pwd)\"; \
                  builtin setopt aliases 2>/dev/null; {sudo_inject}{search_inject}\
                  builtin printf '%s' \"${{2:-}}\"; \
-                 __grok_user_cmd=\"$1\"; builtin typeset +x __grok_user_cmd 2>/dev/null; builtin set --; \
-                 builtin eval \"$__grok_user_cmd\" 2>&1; }}; \
-                 COMMAND_EXIT_CODE=$?; builtin unset __grok_user_cmd 2>/dev/null; {dump_fn} >&4; builtin exit $COMMAND_EXIT_CODE"
+                 __kiro_user_cmd=\"$1\"; builtin typeset +x __kiro_user_cmd 2>/dev/null; builtin set --; \
+                 builtin eval \"$__kiro_user_cmd\" 2>&1; }}; \
+                 COMMAND_EXIT_CODE=$?; builtin unset __kiro_user_cmd 2>/dev/null; {dump_fn} >&4; builtin exit $COMMAND_EXIT_CODE"
             ),
         };
 

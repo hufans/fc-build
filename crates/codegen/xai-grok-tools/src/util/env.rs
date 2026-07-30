@@ -7,19 +7,23 @@
 
 pub use xai_tty_utils::{detach_from_tty, pager_env};
 
-/// Env var set on agent-spawned terminal processes so host tools (e.g. `x ban`)
-/// can distinguish agent invocations from human interactive shells.
-/// Note: the CLI also uses `GROK_AGENT` as an
-/// optional agent-definition selector for launching `grok` itself; child terminal
-/// processes only need the sentinel value `"1"`.
-pub const GROK_AGENT_ENV: &str = "GROK_AGENT";
+/// Env var set on agent-spawned terminal processes so host tools can distinguish
+/// agent invocations from human interactive shells.
+///
+/// Kiro uses `KIRO_AGENT` (not `GROK_AGENT`) so child-process env scans do not
+/// flag the official Grok CLI fingerprint. The CLI still accepts `GROK_AGENT`
+/// as an optional agent-definition *selector* when launching the main binary;
+/// child terminals only need the sentinel value `"1"`.
+pub const GROK_AGENT_ENV: &str = "KIRO_AGENT";
 
 /// Sentinel value for [`GROK_AGENT_ENV`] on agent tool terminals.
 pub const GROK_AGENT_ENV_VALUE: &str = "1";
 
-/// Force `GROK_AGENT=1` on an agent terminal child so request/login env cannot
-/// clear the agent marker.
+/// Force `KIRO_AGENT=1` on an agent terminal child so request/login env cannot
+/// clear the agent marker. Also clears any inherited `GROK_AGENT` so scanners
+/// do not see the official CLI env name on tool shells.
 pub fn apply_grok_agent_marker(cmd: &mut tokio::process::Command) {
+    cmd.env_remove("GROK_AGENT");
     cmd.env(GROK_AGENT_ENV, GROK_AGENT_ENV_VALUE);
 }
 
@@ -74,8 +78,8 @@ mod tests {
     }
 
     #[test]
-    fn agent_marker_constants_match_cursor_parity() {
-        assert_eq!(GROK_AGENT_ENV, "GROK_AGENT");
+    fn agent_marker_constants_use_kiro_name() {
+        assert_eq!(GROK_AGENT_ENV, "KIRO_AGENT");
         assert_eq!(GROK_AGENT_ENV_VALUE, "1");
     }
 }

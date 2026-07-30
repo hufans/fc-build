@@ -30,7 +30,7 @@ web search · long-running tasks · headless / CI · Agent Client Protocol (ACP)
 | CLI command | `grok` | **`kiro`** |
 | Binary name | `grok` / `xai-grok-pager` | **`kiro`** |
 | Auth & API | Grok / xAI | **Same** (official endpoints) |
-| Config dir | `~/.grok` | **Same** (`~/.grok`, `$GROK_HOME`) |
+| Config dir | `~/.grok` | **`~/.kiro`** (`$KIRO_HOME`; seeds login from `~/.grok` once) |
 | Source | [xai-org/grok-build](https://github.com/xai-org/grok-build) | Fork: [hufans/kiro-build](https://github.com/hufans/kiro-build) |
 
 More detail for maintainers: **[KIRO.md](./KIRO.md)**.
@@ -109,7 +109,7 @@ irm https://x.ai/cli/install.ps1 | iex          # Windows PowerShell
 grok --version
 ```
 
-Installs `grok`, not `kiro`. Config under `~/.grok` is compatible with either.
+Installs `grok`, not `kiro`. Kiro will seed login from `~/.grok` into `~/.kiro` on first run.
 
 ---
 
