@@ -324,40 +324,28 @@ cron / 手动
   → fetch xai-org/grok-build
   → 无新提交 → 结束
   → merge upstream/main → main
-      ├─ 无冲突 → push main → dispatch「Build kiro」→ continuous Release
+      ├─ 无冲突 → push main → **同一 run 内 workflow_call「Build kiro」** → continuous
       └─ 有冲突 → 开/更新 Issue（需你本地 resolve 后 push）
 ```
 
 你不需要再开「额外的定时器」：GitHub Actions `schedule` 已经是 **每 24 小时** 一次。  
 （GitHub cron 可能延迟数十分钟到数小时，属正常现象。）
 
-#### 仓库设置检查清单（自动流程能否跑通）
+#### 仓库设置检查清单
 
 | 项 | 期望 |
 |----|------|
 | Actions 已启用 | Settings → Actions → Allow all actions |
-| Workflow 权限 | **Read and write**（或 workflow 内 `permissions:` 能拿到 write） |
-| main 分支保护 | 建议 **不要** 挡 bot push；否则需 PAT + 放行 |
-| Secret `SYNC_PAT` | **推荐**（见下）；无也可先靠 `GITHUB_TOKEN` |
+| Workflow 权限 | 建议 **Read and write**（发 continuous 需要 contents:write） |
+| main 分支保护 | 建议 **不要** 挡 bot push |
+| Secret `SYNC_PAT` | **可选**（仅改变 push 身份；构建不再依赖它） |
 
-#### 推荐配置 Secret：`SYNC_PAT`（提高稳定性）
+#### 故障史
 
-`GITHUB_TOKEN` 的 `git push` **不会**触发其它 workflow，因此同步脚本会 **显式** `gh workflow run "Build kiro"`。  
-加 PAT 后：权限更稳、dispatch 更可靠。
-
-1. GitHub → Settings → Developer settings → Personal access tokens  
-   - classic：`repo` + `workflow`  
-   - 或 fine-grained：本仓库 Contents/PRs/Actions/Issues 写权限  
-2. 仓库 **Settings → Secrets and variables → Actions → New repository secret**  
-3. Name：`SYNC_PAT`，Value：token  
-
-#### 曾失败的原因（2026-07-30）
-
-旧版流程依赖 **创建 PR**，在 fork 上出现：
-
-`Resource not accessible by integration (createPullRequest)`
-
-现已改为 **无冲突时直接 push main + dispatch Build kiro**，不再依赖「Actions 创建 PR」权限。  
+| 日期 | 现象 | 原因 | 修复 |
+|------|------|------|------|
+| 2026-07-30 | 开 PR 失败 | GITHUB_TOKEN 不能 createPullRequest | 改为直推 main |
+| 2026-07-31 | 已 push main，job 仍红 | `gh workflow run "Build kiro"` → `could not find any workflows named Build kiro`；且 bot push **不会**连锁触发 Build | 改为 `workflow_call` 在同一 pipeline 编包发 continuous |
 
 ### 8.2 手动同步
 

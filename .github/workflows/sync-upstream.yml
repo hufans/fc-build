@@ -3,16 +3,18 @@
 # Happy path (no conflicts):
 #   1. merge upstream/main into origin/main
 #   2. push main
-#   3. dispatch "Build kiro" → continuous Release
+#   3. call "Build kiro" via workflow_call → continuous Release
 #
-# Conflicts:
-#   open (or comment on) a GitHub Issue for manual fix
+# Why workflow_call (not `gh workflow run`)?
+#   GITHUB_TOKEN pushes do not start other workflows, and
+#   `gh workflow run "Build kiro"` failed here with:
+#     could not find any workflows named Build kiro
+#   Calling the reusable workflow in-process needs no SYNC_PAT.
 #
-# Optional secret SYNC_PAT:
-#   classic PAT (repo + workflow) or fine-grained with contents/PRs/actions.
-#   Prefer setting it so pushes are attributed to you and workflow dispatch
-#   is reliable. Without it, GITHUB_TOKEN still works for push + dispatch
-#   when repo allows Actions write (no branch protection on main).
+# Conflicts → open/update a GitHub Issue for manual fix.
+#
+# Optional secret SYNC_PAT: only if you want bot pushes attributed to your
+# user; not required for build/release after this change.
 
 name: Sync upstream
 
@@ -23,7 +25,7 @@ on:
   workflow_dispatch:
     inputs:
       auto_merge:
-        description: "Push clean merge to main and trigger Build kiro"
+        description: "Push clean merge to main and run Build kiro"
         type: boolean
         default: true
 
@@ -42,6 +44,9 @@ jobs:
     name: Fetch upstream and merge
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    outputs:
+      should_build: ${{ steps.flags.outputs.should_build }}
+      head: ${{ steps.merge.outputs.head }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -102,7 +107,6 @@ jobs:
             echo "conflict=true" >> "$GITHUB_OUTPUT"
             git merge --abort || true
             echo "Merge has conflicts — needs manual resolution."
-            # Do not fail the job; the issue step will notify.
             exit 0
           fi
 
@@ -119,35 +123,21 @@ jobs:
           echo "### Pushed merge to main (\`${{ steps.merge.outputs.head }}\`)" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Keep sync/upstream branch as mirror (optional audit)
-        if: >-
-          steps.status.outputs.already_up_to_date != 'true'
-          && steps.merge.outputs.conflict != 'true'
-          && steps.push.outputs.pushed == 'true'
+        if: steps.push.outputs.pushed == 'true'
         continue-on-error: true
         run: |
           set -euo pipefail
           git branch -f sync/upstream main
           git push -u origin sync/upstream --force-with-lease || true
 
-      - name: Trigger Build kiro after clean push
-        if: >-
-          steps.status.outputs.already_up_to_date != 'true'
-          && steps.merge.outputs.conflict != 'true'
-          && steps.push.outputs.pushed == 'true'
-        env:
-          GH_TOKEN: ${{ secrets.SYNC_PAT || secrets.GITHUB_TOKEN }}
+      - name: Set should_build flag
+        id: flags
         run: |
-          set -euo pipefail
-          # GITHUB_TOKEN pushes do not start other workflows; always dispatch.
-          # SYNC_PAT pushes also dispatch as a belt-and-suspenders (in case the
-          # push event is delayed or filtered).
-          sleep 3
-          if gh workflow run "Build kiro" --ref main; then
-            echo "Dispatched Build kiro on main"
-            echo "### Dispatched **Build kiro**" >> "$GITHUB_STEP_SUMMARY"
+          if [ "${{ steps.push.outputs.pushed }}" = "true" ]; then
+            echo "should_build=true" >> "$GITHUB_OUTPUT"
+            echo "### Will run **Build kiro** via workflow_call" >> "$GITHUB_STEP_SUMMARY"
           else
-            echo "::warning::Failed to dispatch Build kiro — check Actions permissions / SYNC_PAT"
-            exit 1
+            echo "should_build=false" >> "$GITHUB_OUTPUT"
           fi
 
       - name: File issue when merge conflicts
@@ -187,3 +177,12 @@ jobs:
             gh issue create --title "$TITLE" --body "$BODY"
           fi
           echo "### ⚠️ Conflicts — opened/updated Issue" >> "$GITHUB_STEP_SUMMARY"
+
+  # Same workflow run → no GITHUB_TOKEN cross-workflow dispatch needed.
+  build-and-release:
+    name: Build kiro + continuous
+    needs: sync
+    if: needs.sync.outputs.should_build == 'true'
+    uses: ./.github/workflows/build-kiro.yml
+    permissions:
+      contents: write

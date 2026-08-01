@@ -1,5 +1,9 @@
 # Build the kiro CLI on every merge/push to main (and on PRs / manual run).
 # Artifacts are uploaded for download from the Actions run page.
+#
+# Also callable via workflow_call from "Sync upstream" so a GITHUB_TOKEN
+# merge can still publish continuous without relying on workflow_dispatch
+# (which is flaky / blocked for GITHUB_TOKEN).
 
 name: Build kiro
 
@@ -9,6 +13,7 @@ on:
   pull_request:
     branches: [main]
   workflow_dispatch:
+  workflow_call:
 
 concurrency:
   group: build-kiro-${{ github.workflow }}-${{ github.ref }}
@@ -130,11 +135,17 @@ jobs:
           retention-days: 30
 
   # Publish a rolling "continuous" release so install.sh can curl a stable URL.
-  # Only on push to main (not PRs). Publishes whatever platforms built successfully.
+  # On push to main, or when invoked via workflow_call (Sync upstream). Not on PRs.
   release:
     name: Publish continuous release
     needs: build
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.build.result == 'success'
+    if: >-
+      needs.build.result == 'success'
+      && (
+        (github.event_name == 'push' && github.ref == 'refs/heads/main')
+        || github.event_name == 'workflow_call'
+        || github.event_name == 'workflow_dispatch'
+      )
     runs-on: ubuntu-latest
     permissions:
       contents: write
