@@ -135,17 +135,16 @@ jobs:
           retention-days: 30
 
   # Publish a rolling "continuous" release so install.sh can curl a stable URL.
-  # On push to main, or when invoked via workflow_call (Sync upstream). Not on PRs.
+  # Publish on any successful non-PR run (push/main, workflow_dispatch, and
+  # Sync-upstream schedule/workflow_call). Reusable workflows inherit the
+  # *caller's* event_name, so schedule → workflow_call arrives as "schedule",
+  # not "workflow_call" — do not require event_name == workflow_call.
   release:
     name: Publish continuous release
     needs: build
     if: >-
       needs.build.result == 'success'
-      && (
-        (github.event_name == 'push' && github.ref == 'refs/heads/main')
-        || github.event_name == 'workflow_call'
-        || github.event_name == 'workflow_dispatch'
-      )
+      && github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     permissions:
       contents: write
