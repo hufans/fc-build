@@ -1,4 +1,4 @@
-# Periodically merge xai-org/grok-build into this fork (daily).
+# Periodically merge optional upstream monorepo into this fork (daily).
 #
 # Happy path (no conflicts):
 #   1. merge upstream/main into origin/main
@@ -97,7 +97,7 @@ jobs:
 
           if git merge upstream/main -m "chore: sync from upstream $(date -u +%Y-%m-%d)
 
-          Merge xai-org/grok-build main into this fork.
+          Merge upstream monorepo main into this fork.
           Keep fc branding / install / CI / ~/.fc patches on conflict.
           "; then
             echo "conflict=false" >> "$GITHUB_OUTPUT"
@@ -167,7 +167,7 @@ jobs:
 
           After push, **Build fc** should refresh the \`continuous\` Release.
 
-          See [KIRO.md](https://github.com/${{ github.repository }}/blob/main/KIRO.md).
+          See [FC.md](https://github.com/${{ github.repository }}/blob/main/FC.md).
           EOF
           )"
           if [ -n "$EXISTING" ]; then

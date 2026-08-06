@@ -2,38 +2,31 @@
 
 # fc
 
-**fc** is a local rebrand of [SpaceXAI Grok Build](https://x.ai/cli): the same
-terminal AI coding agent, compiled so the CLI binary and display name are
-`fc` instead of `grok`.
-
-Full-screen TUI · understands your codebase · edits files · runs shell commands ·
-web search · long-running tasks · headless / CI · Agent Client Protocol (ACP)
+**fc** is a terminal AI coding agent: full-screen TUI, codebase-aware edits,
+shell tools, web search, long-running tasks, headless / CI, and Agent Client
+Protocol (ACP).
 
 [Install](#install) ·
 [Build from source](#build-from-source) ·
 [CI artifacts](#ci-artifacts) ·
 [Docs](#documentation) ·
 [Layout](#repository-layout) ·
-[Upstream](#upstream--maintenance) ·
 [License](#license)
-
-![Grok Build TUI](https://media.x.ai/v1/website/universe-tui-screenshot-6f7a0837.png)
 
 </div>
 
 ---
 
-## What is this?
+## Quick facts
 
-| | Official Grok Build | This repo (**fc**) |
-|--|---------------------|----------------------|
-| CLI command | `grok` | **`fc`** |
-| Binary name | `grok` / `xai-grok-pager` | **`fc`** |
-| Auth & API | Grok / xAI | **Same** (official endpoints) |
-| Config dir | `~/.grok` | **`~/.fc`** (`$FC_HOME`; seeds login from `~/.grok` once) |
-| Source | [xai-org/grok-build](https://github.com/xai-org/grok-build) | Fork: [hufans/kiro-build](https://github.com/hufans/kiro-build) |
+| | |
+|--|--|
+| CLI / binary | **`fc`** |
+| Config directory | **`~/.fc`** (`$FC_HOME`) |
+| Install | `~/.local/bin/fc` (see below) |
+| Source | [hufans/fc-build](https://github.com/hufans/fc-build) |
 
-More detail for maintainers: **[KIRO.md](./KIRO.md)**.
+Maintainer notes: **[FC.md](./FC.md)**.
 
 ---
 
@@ -44,7 +37,7 @@ More detail for maintainers: **[KIRO.md](./KIRO.md)**.
 After CI has published a **continuous** release (runs on every merge to `main`):
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/hufans/kiro-build/main/scripts/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/hufans/fc-build/main/scripts/install.sh | bash
 fc --version
 ```
 
@@ -52,64 +45,54 @@ What it does:
 
 1. Detects OS/arch (Apple Silicon / Intel Mac / Linux x86_64)
 2. Downloads the matching binary from  
-   `https://github.com/hufans/kiro-build/releases/download/continuous/...`
+   `https://github.com/hufans/fc-build/releases/download/continuous/...`
 3. Installs to `~/.local/bin/fc` (override with `FC_BIN_DIR`)
 
 Optional:
 
 ```sh
 # custom install dir
-FC_BIN_DIR=$HOME/bin curl -fsSL ... | bash
+FC_BIN_DIR=$HOME/bin curl -fsSL https://raw.githubusercontent.com/hufans/fc-build/main/scripts/install.sh | bash
+```
+
+On zsh/bash, `fc` may collide with the shell builtin / `/usr/bin/fc`. Prefer:
+
+```sh
+alias fc='$HOME/.local/bin/fc'   # in ~/.zshrc or ~/.bashrc
 ```
 
 ### Update in place
-
-After install (or any `fc` binary built from this fork):
 
 ```sh
 fc update          # download latest continuous release + replace binary
 fc update --check  # only check
 ```
 
-Uses GitHub Release tag `continuous` (same assets as install.sh). Restart the
-terminal session after a successful update.
-
-If download fails, the `continuous` release may not exist yet — wait for the
-[Build fc](https://github.com/hufans/kiro-build/actions) workflow to finish,
-or build from source below.
+Uses GitHub Release tag `continuous`. Restart the terminal after a successful
+update. If download fails, wait for the
+[Build fc](https://github.com/hufans/fc-build/actions) workflow, or build from
+source below.
 
 ### Build from source
-
-See [Build from source](#build-from-source), then:
 
 ```sh
 install -m 755 target/release/fc ~/.local/bin/fc
 fc --version
 ```
 
+(See [Build from source](#build-from-source) for full requirements.)
+
 ### CI artifacts (manual)
 
-→ [Actions · Build fc](https://github.com/hufans/kiro-build/actions)  
-→ [Releases · continuous](https://github.com/hufans/kiro-build/releases/tag/continuous)
+→ [Actions · Build fc](https://github.com/hufans/fc-build/actions)  
+→ [Releases · continuous](https://github.com/hufans/fc-build/releases/tag/continuous)
 
 | Asset | Platform |
 |-------|----------|
-| `fc-darwin-arm64` | Apple Silicon (M1/M2/M3…) |
+| `fc-darwin-arm64` | Apple Silicon |
 | `fc-linux-x86_64` | Linux x86_64 |
 
 Intel Mac: build from source (CI does not publish x86_64 macOS assets by default).
-
-### Official `grok` (upstream installer)
-
-Official product name and CDN installer (not this fork):
-
-```sh
-curl -fsSL https://x.ai/cli/install.sh | bash   # macOS / Linux
-irm https://x.ai/cli/install.ps1 | iex          # Windows PowerShell
-grok --version
-```
-
-Installs `grok`, not `fc`. This fork seeds login from `~/.kiro` / `~/.grok` into `~/.fc` on first run.
 
 ---
 
@@ -117,25 +100,24 @@ Installs `grok`, not `fc`. This fork seeds login from `~/.kiro` / `~/.grok` into
 
 **Requirements**
 
-- **Rust** — pinned by [`rust-toolchain.toml`](rust-toolchain.toml) (rustup installs it on first build)
-- **[DotSlash](https://dotslash-cli.com)** — for hermetic tools under [`bin/`](bin/) (e.g. [`bin/protoc`](bin/protoc)):
+- **Rust** — pinned by [`rust-toolchain.toml`](rust-toolchain.toml)
+- **[DotSlash](https://dotslash-cli.com)** — for hermetic tools under [`bin/`](bin/):
 
   ```sh
   cargo install dotslash
-  /usr/bin/env dotslash --help
   ```
 
-- **protoc** — via `bin/protoc` (DotSlash) or `$PROTOC` / `protoc` on `PATH`  
-  - **Intel Mac (x86_64):** repo DotSlash may not ship `macos-x86_64`; install protoc yourself (e.g. protobuf **29.3**) and set `PROTOC`.
+- **protoc** — via `bin/protoc` (DotSlash) or `$PROTOC` on `PATH`  
+  - **Intel Mac (x86_64):** set `PROTOC` to a local protoc (e.g. 29.3) if DotSlash has no `macos-x86_64` stub.
 
 ```sh
-cargo run -p xai-grok-pager-bin -- --version     # build + run
-cargo build -p xai-grok-pager-bin --release      # → target/release/fc
+cargo build -p xai-grok-pager-bin --release --bin fc   # → target/release/fc
 cargo check -p xai-grok-pager-bin
+./target/release/fc --version
 ```
 
-On first launch, browser login uses the official Grok auth flow — see the
-[authentication guide](crates/codegen/xai-grok-pager/docs/user-guide/02-authentication.md).
+On first launch, complete the in-app login flow. Config and credentials live under
+**`~/.fc`**.
 
 ---
 
@@ -145,19 +127,18 @@ Workflow: [`.github/workflows/build-fc.yml`](.github/workflows/build-fc.yml)
 
 | Trigger | When |
 |---------|------|
-| `push` to `main` | Build all platforms + publish **`continuous`** release |
-| `pull_request` to `main` | Build only (no release) |
+| `push` to `main` | Build + publish **`continuous`** release |
+| `pull_request` to `main` | Build only |
 | `workflow_dispatch` | Manual run |
 
-Installer script: [`scripts/install.sh`](scripts/install.sh)
+Installer: [`scripts/install.sh`](scripts/install.sh)
 
 ---
 
 ## Documentation
 
-- Maintainer notes for this fork: **[KIRO.md](./KIRO.md)**
-- Official product docs: [docs.x.ai/build/overview](https://docs.x.ai/build/overview)
-- In-tree user guide (upstream docs, still say “grok” in places):  
+- Maintainer guide: **[FC.md](./FC.md)**
+- In-tree user guide (some pages still use upstream wording):  
   [`crates/codegen/xai-grok-pager/docs/user-guide/`](crates/codegen/xai-grok-pager/docs/user-guide/)
 
 ---
@@ -174,7 +155,7 @@ Installer script: [`scripts/install.sh`](scripts/install.sh)
 | `crates/codegen/...` | Config, MCP, markdown, sandbox, … |
 | `crates/common/`, `crates/build/`, `prod/mc/` | Shared leaf crates |
 | `third_party/` | Vendored Mermaid-related sources |
-| `KIRO.md` | Fork-specific maintenance guide |
+| `FC.md` | Fork-specific maintenance guide |
 
 > [!IMPORTANT]
 > The root `Cargo.toml` (workspace members, dependency versions, lints,
@@ -186,46 +167,31 @@ Installer script: [`scripts/install.sh`](scripts/install.sh)
 ## Development
 
 ```sh
-cargo check -p <crate>        # prefer per-crate; full workspace is slow
+cargo check -p <crate>
 cargo test -p xai-grok-config
 cargo clippy -p <crate>
 cargo fmt --all
 ```
 
-### Git remotes (this fork)
+### Git remotes
 
 | remote | URL |
 |--------|-----|
-| `origin` | `git@github.com:hufans/kiro-build.git` |
-| `upstream` | `https://github.com/xai-org/grok-build` |
+| `origin` | `git@github.com:hufans/fc-build.git` |
 
 ```sh
-git fetch upstream
-git merge upstream/main   # or rebase; resolve kiro naming conflicts carefully
 git push origin main
 ```
 
-**Automated:** workflow [Sync upstream](https://github.com/hufans/kiro-build/actions/workflows/sync-upstream.yml) runs daily and can open/merge a PR from `xai-org/grok-build`. See [KIRO.md §8](./KIRO.md). Optional secret `SYNC_PAT` improves CI triggering after auto-merge.
-
----
-
-## Upstream & maintenance
-
-- **Upstream:** [xai-org/grok-build](https://github.com/xai-org/grok-build)  
-- **This fork:** [hufans/kiro-build](https://github.com/hufans/kiro-build)  
-- `SOURCE_REV` records the monorepo commit SHA for the synced tree.
-
-Local changes are intentionally small (binary/CLI name `fc`) so merges from
-upstream stay manageable. See [KIRO.md](./KIRO.md).
+Optional daily sync workflow: [Sync upstream](https://github.com/hufans/fc-build/actions/workflows/sync-upstream.yml) — see [FC.md](./FC.md).
 
 ---
 
 ## Contributing
 
 > [!NOTE]
-> This is a personal fork. Prefer issues/PRs on this repo only for **Kiro-specific**
-> packaging and branding. Upstream product contributions are not accepted here;
-> see upstream [`CONTRIBUTING.md`](CONTRIBUTING.md).
+> This is a personal packaging fork. Prefer issues/PRs here for **fc-specific**
+> install, branding, and release packaging.
 
 ---
 

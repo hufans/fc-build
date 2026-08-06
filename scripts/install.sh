@@ -2,17 +2,17 @@
 #
 # fc one-line installer
 #
-#   curl -fsSL https://raw.githubusercontent.com/hufans/kiro-build/main/scripts/install.sh | bash
+#   curl -fsSL https://raw.githubusercontent.com/hufans/fc-build/main/scripts/install.sh | bash
 #
 # Optional env:
-#   FC_REPO     GitHub owner/repo (default: hufans/kiro-build)
+#   FC_REPO     GitHub owner/repo (default: hufans/fc-build)
 #   FC_TAG      Release tag (default: continuous)
 #   FC_BIN_DIR  Install directory (default: ~/.local/bin)
 #   FC_VERSION  Pin a specific release tag instead of FC_TAG
 #
 set -euo pipefail
 
-REPO="${FC_REPO:-hufans/kiro-build}"
+REPO="${FC_REPO:-hufans/fc-build}"
 TAG="${FC_VERSION:-${FC_TAG:-continuous}}"
 BIN_DIR="${FC_BIN_DIR:-$HOME/.local/bin}"
 BASE_URL="https://github.com/${REPO}/releases/download/${TAG}"
@@ -57,7 +57,7 @@ case "${os_name}-${arch_name}" in
   darwin-x86_64)
     die "Intel Mac (x86_64) binaries are not published in continuous releases yet.
   Build from source on this machine:
-    git clone https://github.com/${REPO}.git && cd kiro-build
+    git clone https://github.com/${REPO}.git && cd fc-build
     cargo build -p xai-grok-pager-bin --release --bin fc
     install -m 755 target/release/fc ~/.local/bin/fc"
     ;;
@@ -104,19 +104,11 @@ if [ -n "$version_line" ]; then
   info "  version:   ${version_line}"
 fi
 
-# Mark this install as fc-managed so `fc update` uses continuous Releases
-# instead of the official x.ai CDN. Config lives under ~/.fc (not ~/.grok)
-# to avoid home-dir path fingerprints used by endpoint scanners.
+# Mark this install as fc-managed so `fc update` uses continuous Releases.
+# Config lives under ~/.fc.
 FC_HOME_DIR="${FC_HOME:-${HOME}/.fc}"
 CONFIG_FILE="${FC_HOME_DIR}/config.toml"
 mkdir -p "${FC_HOME_DIR}"
-# One-time seed of login/config from official ~/.grok when present.
-if [ -d "${HOME}/.grok" ] && [ ! -f "${CONFIG_FILE}" ] && [ -f "${HOME}/.grok/config.toml" ]; then
-  cp "${HOME}/.grok/config.toml" "${CONFIG_FILE}" 2>/dev/null || true
-fi
-if [ -d "${HOME}/.grok" ] && [ ! -f "${FC_HOME_DIR}/auth.json" ] && [ -f "${HOME}/.grok/auth.json" ]; then
-  cp "${HOME}/.grok/auth.json" "${FC_HOME_DIR}/auth.json" 2>/dev/null || true
-fi
 if [ ! -f "$CONFIG_FILE" ]; then
   printf '[cli]\ninstaller = "fc"\n' > "$CONFIG_FILE"
 elif grep -q '^\[cli\]' "$CONFIG_FILE" 2>/dev/null; then
@@ -182,4 +174,4 @@ else
 fi
 
 info ""
-info "Auth uses official Grok login; config stays in ~/.grok"
+info "Config directory: ~/.fc  (override with FC_HOME)"

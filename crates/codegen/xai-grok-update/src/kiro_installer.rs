@@ -1,15 +1,14 @@
-//! Self-update backend for the `fc` fork binary.
+//! Self-update backend for the `fc` binary.
 //!
 //! Downloads rolling artifacts from GitHub Releases tag `continuous` on
-//! `hufans/kiro-build` (override with `FC_RELEASE_REPO` / `FC_RELEASE_TAG`).
-//! Repo slug may still say "kiro-build" (GitHub name); the product binary is `fc`.
+//! `hufans/fc-build` (override with `FC_RELEASE_REPO` / `FC_RELEASE_TAG`).
 
 use anyhow::{Context, Result, bail};
 use std::path::{Path, PathBuf};
 use tokio::process::Command;
 
 /// Default GitHub repo that hosts `continuous` release assets.
-pub const DEFAULT_REPO: &str = "hufans/kiro-build";
+pub const DEFAULT_REPO: &str = "hufans/fc-build";
 /// Default release tag (rolling).
 pub const DEFAULT_TAG: &str = "continuous";
 
