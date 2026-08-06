@@ -12,8 +12,8 @@
 //! parses the flags itself.
 //!
 //! Resolve (host side, memoized): env override if a regular file → bundled binary
-//! (release builds, self-extracted to `~/.grok/vendor/<name>-<ver>-<target>`) →
-//! `~/.grok/vendor/{name}` if a regular file → `which` on the agent `$PATH`.
+//! (release builds, self-extracted to `~/.fc/vendor/<name>-<ver>-<target>`) →
+//! `~/.fc/vendor/{name}` if a regular file → `which` on the agent `$PATH`.
 //! Env/vendor only require `is_file()` as a lenient hint (no `--version` probe).
 //! This memoized path is only a *hint*: the injected shadow re-resolves at
 //! **call time** — it uses the hint when it's still *executable* (`[ -x ]`), else
@@ -23,7 +23,7 @@
 //! reachable only through the login shell is still found.
 //!
 //! Inject is **always** non-empty on Unix callers: either install a shadow
-//! function (which tags itself with a `__grok_shadow_{name}` marker) or a
+//! function (which tags itself with a `__fc_shadow_{name}` marker) or a
 //! marker-gated `unalias`+`unset -f` that drops *only* a prior harness shadow —
 //! never a user-defined `find`/`grep` function replayed from the snapshot.
 
@@ -46,7 +46,7 @@ const UGREP_DEFAULT_ARGS: &[&str] = &[
 ];
 
 // Binaries embedded by build.rs when `GROK_TOOLS_BUNDLE_{BFS,UGREP}_PATH` is set
-// (release pipeline). Self-extracted to `~/.grok/vendor` on first use, mirroring
+// (release pipeline). Self-extracted to `~/.fc/vendor` on first use, mirroring
 // the ripgrep bundling in `grok_build::grep::ripgrep`.
 #[cfg(bundle_bfs)]
 const BFS_BYTES: &[u8] = include_bytes!(concat!(
@@ -100,16 +100,16 @@ fn build_injection(find_on: bool, grep_on: bool, tools: &ResolvedTools) -> Strin
 }
 
 /// Drop a *previously installed harness* shadow so command-word `{name}` uses the
-/// OS binary again. Gated on the `__grok_shadow_{name}` marker that
+/// OS binary again. Gated on the `__fc_shadow_{name}` marker that
 /// [`shell_function`] sets, so a user-defined `{name}` function replayed from the
 /// shell snapshot is left intact — only the harness's own shadow is removed.
 /// `set -u`/`set -e` safe and idempotent (`unset -f` is bash + zsh).
 fn restore_command(name: &str) -> String {
     format!(
-        "if [ -n \"${{__grok_shadow_{name}-}}\" ]; then \
+        "if [ -n \"${{__fc_shadow_{name}-}}\" ]; then \
            unalias {name} 2>/dev/null || true; \
            unset -f {name} 2>/dev/null || true; \
-           unset __grok_shadow_{name} 2>/dev/null || true; \
+           unset __fc_shadow_{name} 2>/dev/null || true; \
          fi"
     )
 }
@@ -127,7 +127,7 @@ fn resolved_tools() -> &'static ResolvedTools {
     })
 }
 
-/// Write embedded `bytes` to `~/.grok/vendor/<versioned_name>` (chmod 755) on
+/// Write embedded `bytes` to `~/.fc/vendor/<versioned_name>` (chmod 755) on
 /// first use and return the path; reused on later runs. Versioned so bumping the
 /// bundled version writes a fresh file instead of reusing a stale one.
 #[cfg(any(bundle_bfs, bundle_ugrep))]
@@ -216,7 +216,7 @@ fn resolve_tool(bin_name: &str, env_override: &str, bundled: Option<PathBuf>) ->
 }
 
 /// Resolution order: explicit env path → bundled (self-extracted) →
-/// `~/.grok/vendor/<bin>` → `which`. Env and vendor only require `is_file()` here
+/// `~/.fc/vendor/<bin>` → `which`. Env and vendor only require `is_file()` here
 /// (a lenient hint, no `+x` probe) so an odd-permission copy still resolves; the
 /// injected shadow gates on `[ -x ]` at call time and falls back to the OS binary
 /// if the hint isn't executable, so a non-exec path can't hard-fail `find`/`grep`.
@@ -265,7 +265,7 @@ fn bash_safe_quote(s: &str) -> String {
 /// keeps the probe `set -u`-safe (a bare `$ZSH_VERSION` aborts bash under
 /// nounset). `exec -a` gives the binary the `find`/`grep` argv0 (ps display +
 /// ugrep grep-personality) in both bash and zsh. The trailing
-/// `__grok_shadow_{name}=1` marks this as a harness shadow so `restore_command`
+/// `__fc_shadow_{name}=1` marks this as a harness shadow so `restore_command`
 /// only ever removes our own function — never a user's.
 fn shell_function(
     name: &str,
@@ -284,12 +284,12 @@ fn shell_function(
             format!("{} ", qargs.join(" "))
         }
     };
-    // `local __grok_bin` is re-resolved every call. The host hint is trusted
+    // `local __fc_bin` is re-resolved every call. The host hint is trusted
     // only when it's *executable* (`[ -x ]`, not just `[ -f ]`): the resolver
     // accepts any regular file as a hint, but `exec` needs `+x`, so a non-exec
     // hint must fall through rather than hard-fail with no OS fallback. Then
     // `command -v` on the live shell PATH (returns an executable), else the OS
-    // binary. `|| __grok_bin=''` keeps the lookup `set -e`-safe (a failed
+    // binary. `|| __fc_bin=''` keeps the lookup `set -e`-safe (a failed
     // `command -v` would otherwise abort the function under errexit). The OS
     // fallback uses `command {name}` to bypass this function. `{prepend}` is
     // empty for find, the ugrep default flags for grep (and is omitted from the
@@ -297,16 +297,16 @@ fn shell_function(
     format!(
         "unalias {name} 2>/dev/null || true; \
          {name}() {{ \
-           local __grok_bin={qpref}; \
-           [ -x \"$__grok_bin\" ] || __grok_bin=$(command -v {bin_name} 2>/dev/null) || __grok_bin=''; \
-           if [ -z \"$__grok_bin\" ]; then command {name} \"$@\"; return; fi; \
+           local __fc_bin={qpref}; \
+           [ -x \"$__fc_bin\" ] || __fc_bin=$(command -v {bin_name} 2>/dev/null) || __fc_bin=''; \
+           if [ -z \"$__fc_bin\" ]; then command {name} \"$@\"; return; fi; \
            if [[ -z ${{ZSH_VERSION-}} ]] && (( BASH_SUBSHELL > 0 )); then \
-             exec -a {name} \"$__grok_bin\" {prepend}\"$@\"; \
+             exec -a {name} \"$__fc_bin\" {prepend}\"$@\"; \
            else \
-             (exec -a {name} \"$__grok_bin\" {prepend}\"$@\"); \
+             (exec -a {name} \"$__fc_bin\" {prepend}\"$@\"); \
            fi; \
          }}; \
-         __grok_shadow_{name}=1"
+         __fc_shadow_{name}=1"
     )
 }
 
@@ -326,20 +326,20 @@ mod tests {
     fn shell_function_shape() {
         let fn_body = shell_function("find", "bfs", Some(Path::new("/tmp/bfs")), &[]);
         assert!(fn_body.contains("unalias find"));
-        // Preferred path is the fast-path hint; the shadow execs `$__grok_bin`.
-        assert!(fn_body.contains("local __grok_bin=/tmp/bfs"));
-        assert!(fn_body.contains("exec -a find \"$__grok_bin\" \"$@\""));
+        // Preferred path is the fast-path hint; the shadow execs `$__fc_bin`.
+        assert!(fn_body.contains("local __fc_bin=/tmp/bfs"));
+        assert!(fn_body.contains("exec -a find \"$__fc_bin\" \"$@\""));
         // Hint is trusted only when executable (`[ -x ]`, not `[ -f ]`), so a
         // non-exec hint falls through instead of hard-failing exec.
-        assert!(fn_body.contains("[ -x \"$__grok_bin\" ]"));
-        assert!(!fn_body.contains("[ -f \"$__grok_bin\" ]"));
+        assert!(fn_body.contains("[ -x \"$__fc_bin\" ]"));
+        assert!(!fn_body.contains("[ -f \"$__fc_bin\" ]"));
         // Self-heal: live-PATH lookup + OS fallback.
         assert!(fn_body.contains("command -v bfs"));
         assert!(fn_body.contains("command find \"$@\""));
         assert!(fn_body.contains("BASH_SUBSHELL > 0"));
         assert!(fn_body.contains("(exec -a find"));
         // Marker so `restore_command` only removes our own shadow.
-        assert!(fn_body.contains("__grok_shadow_find=1"));
+        assert!(fn_body.contains("__fc_shadow_find=1"));
         // set -u-safe zsh probe (a bare $ZSH_VERSION aborts bash under nounset).
         assert!(fn_body.contains("${ZSH_VERSION-}"));
         assert!(!fn_body.contains("[[ -n $ZSH_VERSION ]]"));
@@ -349,7 +349,7 @@ mod tests {
     fn shell_function_unresolved_uses_empty_hint() {
         // No host-resolved path → empty hint, relies on live-PATH `command -v`.
         let fn_body = shell_function("find", "bfs", None, &[]);
-        assert!(fn_body.contains("local __grok_bin=''"));
+        assert!(fn_body.contains("local __fc_bin=''"));
         assert!(fn_body.contains("command -v bfs"));
         assert!(fn_body.contains("command find \"$@\""));
     }
@@ -362,8 +362,8 @@ mod tests {
             Some(Path::new("/tmp/ugrep")),
             UGREP_DEFAULT_ARGS,
         );
-        assert!(fn_body.contains("local __grok_bin=/tmp/ugrep"));
-        assert!(fn_body.contains("\"$__grok_bin\" -G --ignore-files --hidden -I"));
+        assert!(fn_body.contains("local __fc_bin=/tmp/ugrep"));
+        assert!(fn_body.contains("\"$__fc_bin\" -G --ignore-files --hidden -I"));
         assert!(fn_body.contains("--exclude-dir=.git"));
         assert!(fn_body.contains("command -v ugrep"));
     }
@@ -373,7 +373,7 @@ mod tests {
         assert_eq!(bash_safe_quote("/usr/bin/bfs"), "/usr/bin/bfs");
         assert_eq!(bash_safe_quote("/tmp/my bfs"), "'/tmp/my bfs'");
         let body = shell_function("find", "bfs", Some(Path::new("/tmp/evil$(id)")), &[]);
-        assert!(body.contains("local __grok_bin='/tmp/evil$(id)'"), "{body}");
+        assert!(body.contains("local __fc_bin='/tmp/evil$(id)'"), "{body}");
         assert!(!body.contains("=/tmp/evil$(id)"));
     }
 
@@ -381,10 +381,10 @@ mod tests {
     fn restore_command_is_marker_gated() {
         let r = restore_command("find");
         // Only removes the harness shadow when our marker is set.
-        assert!(r.contains("if [ -n \"${__grok_shadow_find-}\" ]"));
+        assert!(r.contains("if [ -n \"${__fc_shadow_find-}\" ]"));
         assert!(r.contains("unalias find"));
         assert!(r.contains("unset -f find"));
-        assert!(r.contains("unset __grok_shadow_find"));
+        assert!(r.contains("unset __fc_shadow_find"));
     }
 
     #[test]
@@ -401,8 +401,8 @@ mod tests {
         // from a prior snapshot is dropped, but a user function is left intact.
         let inject = build_injection(false, false, &both_tools());
         assert!(inject.ends_with("; "));
-        assert!(inject.contains("if [ -n \"${__grok_shadow_find-}\" ]"));
-        assert!(inject.contains("if [ -n \"${__grok_shadow_grep-}\" ]"));
+        assert!(inject.contains("if [ -n \"${__fc_shadow_find-}\" ]"));
+        assert!(inject.contains("if [ -n \"${__fc_shadow_grep-}\" ]"));
         assert!(inject.contains("unset -f find"));
         assert!(inject.contains("unset -f grep"));
         assert!(!inject.contains("find()"));
@@ -415,7 +415,7 @@ mod tests {
         assert!(inject.contains("find()"));
         assert!(inject.contains("grep()"));
         assert!(inject.contains("-G --ignore-files"));
-        assert!(inject.contains("__grok_shadow_find=1"));
+        assert!(inject.contains("__fc_shadow_find=1"));
     }
 
     #[test]
@@ -433,7 +433,7 @@ mod tests {
         assert!(inject.contains("command -v ugrep"));
         // OS fallback present; not a marker-gated restore.
         assert!(inject.contains("command find \"$@\""));
-        assert!(!inject.contains("if [ -n \"${__grok_shadow_find-}\" ]"));
+        assert!(!inject.contains("if [ -n \"${__fc_shadow_find-}\" ]"));
     }
 
     #[test]
@@ -538,7 +538,7 @@ mod tests {
 
     /// Only compiled when the binaries are actually bundled (release pipeline, or
     /// `GROK_TOOLS_BUNDLE_{BFS,UGREP}_PATH` at build time). Verifies the embedded
-    /// bytes self-extract under `~/.grok/vendor` and the extracted `bfs` runs.
+    /// bytes self-extract under `~/.fc/vendor` and the extracted `bfs` runs.
     #[cfg(all(bundle_bfs, bundle_ugrep))]
     #[test]
     fn bundled_binaries_extract_and_run() {

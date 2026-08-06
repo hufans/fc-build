@@ -2950,8 +2950,10 @@ fn login_env_var_excluded(key: &str) -> bool {
             | "TERM"
             | "GROK_AGENT"
             | "KIRO_AGENT"
+            | "FC_AGENT"
             | "SUDO_ASKPASS"
             | "GROK_ASKPASS"
+            | "FC_ASKPASS"
             | "ELECTRON_RUN_AS_NODE"
             | "SSH_AUTH_SOCK"
             | "DBUS_SESSION_BUS_ADDRESS"
@@ -4790,13 +4792,13 @@ mod tests {
         let backend = LocalTerminalBackend::with_persistent_shell();
 
         let result = backend
-            .run(make_request("export GROK_PERSIST_TEST=hello123"))
+            .run(make_request("export FC_PERSIST_TEST=hello123"))
             .await
             .unwrap();
         assert_eq!(result.exit_code, Some(0));
 
         let result = backend
-            .run(make_request("echo $GROK_PERSIST_TEST"))
+            .run(make_request("echo $FC_PERSIST_TEST"))
             .await
             .unwrap();
         assert_eq!(result.exit_code, Some(0));
@@ -4814,7 +4816,7 @@ mod tests {
 
         let mut req = make_request("echo \"[$GPG_TTY]\"");
         req.env
-            .insert("GPG_TTY".to_string(), "/grok-sentinel-tty".to_string());
+            .insert("GPG_TTY".to_string(), "/fc-sentinel-tty".to_string());
 
         let result = backend.run(req).await.unwrap();
         assert_eq!(result.exit_code, Some(0));

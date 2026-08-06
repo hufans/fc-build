@@ -1,10 +1,10 @@
 <div align="center">
 
-# Kiro (`kiro`)
+# fc
 
-**Kiro** is a local rebrand of [SpaceXAI Grok Build](https://x.ai/cli): the same
+**fc** is a local rebrand of [SpaceXAI Grok Build](https://x.ai/cli): the same
 terminal AI coding agent, compiled so the CLI binary and display name are
-`kiro` instead of `grok`.
+`fc` instead of `grok`.
 
 Full-screen TUI · understands your codebase · edits files · runs shell commands ·
 web search · long-running tasks · headless / CI · Agent Client Protocol (ACP)
@@ -25,12 +25,12 @@ web search · long-running tasks · headless / CI · Agent Client Protocol (ACP)
 
 ## What is this?
 
-| | Official Grok Build | This repo (**Kiro**) |
+| | Official Grok Build | This repo (**fc**) |
 |--|---------------------|----------------------|
-| CLI command | `grok` | **`kiro`** |
-| Binary name | `grok` / `xai-grok-pager` | **`kiro`** |
+| CLI command | `grok` | **`fc`** |
+| Binary name | `grok` / `xai-grok-pager` | **`fc`** |
 | Auth & API | Grok / xAI | **Same** (official endpoints) |
-| Config dir | `~/.grok` | **`~/.kiro`** (`$KIRO_HOME`; seeds login from `~/.grok` once) |
+| Config dir | `~/.grok` | **`~/.fc`** (`$FC_HOME`; seeds login from `~/.grok` once) |
 | Source | [xai-org/grok-build](https://github.com/xai-org/grok-build) | Fork: [hufans/kiro-build](https://github.com/hufans/kiro-build) |
 
 More detail for maintainers: **[KIRO.md](./KIRO.md)**.
@@ -45,7 +45,7 @@ After CI has published a **continuous** release (runs on every merge to `main`):
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/hufans/kiro-build/main/scripts/install.sh | bash
-kiro --version
+fc --version
 ```
 
 What it does:
@@ -53,29 +53,29 @@ What it does:
 1. Detects OS/arch (Apple Silicon / Intel Mac / Linux x86_64)
 2. Downloads the matching binary from  
    `https://github.com/hufans/kiro-build/releases/download/continuous/...`
-3. Installs to `~/.local/bin/kiro` (override with `KIRO_BIN_DIR`)
+3. Installs to `~/.local/bin/fc` (override with `FC_BIN_DIR`)
 
 Optional:
 
 ```sh
 # custom install dir
-KIRO_BIN_DIR=$HOME/bin curl -fsSL ... | bash
+FC_BIN_DIR=$HOME/bin curl -fsSL ... | bash
 ```
 
 ### Update in place
 
-After install (or any `kiro` binary built from this fork):
+After install (or any `fc` binary built from this fork):
 
 ```sh
-kiro update          # download latest continuous release + replace binary
-kiro update --check  # only check
+fc update          # download latest continuous release + replace binary
+fc update --check  # only check
 ```
 
 Uses GitHub Release tag `continuous` (same assets as install.sh). Restart the
 terminal session after a successful update.
 
 If download fails, the `continuous` release may not exist yet — wait for the
-[Build kiro](https://github.com/hufans/kiro-build/actions) workflow to finish,
+[Build fc](https://github.com/hufans/kiro-build/actions) workflow to finish,
 or build from source below.
 
 ### Build from source
@@ -83,19 +83,19 @@ or build from source below.
 See [Build from source](#build-from-source), then:
 
 ```sh
-install -m 755 target/release/kiro ~/.local/bin/kiro
-kiro --version
+install -m 755 target/release/fc ~/.local/bin/fc
+fc --version
 ```
 
 ### CI artifacts (manual)
 
-→ [Actions · Build kiro](https://github.com/hufans/kiro-build/actions)  
+→ [Actions · Build fc](https://github.com/hufans/kiro-build/actions)  
 → [Releases · continuous](https://github.com/hufans/kiro-build/releases/tag/continuous)
 
 | Asset | Platform |
 |-------|----------|
-| `kiro-darwin-arm64` | Apple Silicon (M1/M2/M3…) |
-| `kiro-linux-x86_64` | Linux x86_64 |
+| `fc-darwin-arm64` | Apple Silicon (M1/M2/M3…) |
+| `fc-linux-x86_64` | Linux x86_64 |
 
 Intel Mac: build from source (CI does not publish x86_64 macOS assets by default).
 
@@ -109,7 +109,7 @@ irm https://x.ai/cli/install.ps1 | iex          # Windows PowerShell
 grok --version
 ```
 
-Installs `grok`, not `kiro`. Kiro will seed login from `~/.grok` into `~/.kiro` on first run.
+Installs `grok`, not `fc`. This fork seeds login from `~/.kiro` / `~/.grok` into `~/.fc` on first run.
 
 ---
 
@@ -130,7 +130,7 @@ Installs `grok`, not `kiro`. Kiro will seed login from `~/.grok` into `~/.kiro` 
 
 ```sh
 cargo run -p xai-grok-pager-bin -- --version     # build + run
-cargo build -p xai-grok-pager-bin --release      # → target/release/kiro
+cargo build -p xai-grok-pager-bin --release      # → target/release/fc
 cargo check -p xai-grok-pager-bin
 ```
 
@@ -141,7 +141,7 @@ On first launch, browser login uses the official Grok auth flow — see the
 
 ## CI & releases
 
-Workflow: [`.github/workflows/build-kiro.yml`](.github/workflows/build-kiro.yml)
+Workflow: [`.github/workflows/build-fc.yml`](.github/workflows/build-fc.yml)
 
 | Trigger | When |
 |---------|------|
@@ -166,7 +166,7 @@ Installer script: [`scripts/install.sh`](scripts/install.sh)
 
 | Path | Contents |
 |------|----------|
-| `crates/codegen/xai-grok-pager-bin` | Composition root; builds the **`kiro`** binary |
+| `crates/codegen/xai-grok-pager-bin` | Composition root; builds the **`fc`** binary |
 | `crates/codegen/xai-grok-pager` | TUI: scrollback, prompt, modals, rendering |
 | `crates/codegen/xai-grok-shell` | Agent runtime + leader / stdio / headless |
 | `crates/codegen/xai-grok-tools` | Tools (terminal, file edit, search, …) |
@@ -215,7 +215,7 @@ git push origin main
 - **This fork:** [hufans/kiro-build](https://github.com/hufans/kiro-build)  
 - `SOURCE_REV` records the monorepo commit SHA for the synced tree.
 
-Local changes are intentionally small (binary/CLI name `kiro`) so merges from
+Local changes are intentionally small (binary/CLI name `fc`) so merges from
 upstream stay manageable. See [KIRO.md](./KIRO.md).
 
 ---

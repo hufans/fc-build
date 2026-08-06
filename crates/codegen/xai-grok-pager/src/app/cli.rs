@@ -78,8 +78,8 @@ clipboard (containers, SSH) and your terminal does not handle OSC 52 itself
 sync with your window size.
 
 Examples:
-  kiro wrap docker exec -it my-container bash
-  kiro wrap kubectl exec -it my-pod -- bash
+  fc wrap docker exec -it my-container bash
+  fc wrap kubectl exec -it my-pod -- bash
 
 See ~/.grok/README.md for more information.
 ")]
@@ -398,9 +398,9 @@ pub struct LeaderArgs {
 }
 #[derive(Debug, Clone, Parser)]
 #[command(
-    name = "kiro",
+    name = "fc",
     version = env!("VERSION_WITH_COMMIT"),
-    about = "Kiro TUI",
+    about = "fc TUI",
     disable_version_flag = true,
     next_display_order = None,
     help_template = "\
@@ -764,7 +764,7 @@ pub struct PagerArgs {
     /// Run standalone even when leader mode is configured.
     #[arg(long, conflicts_with = "leader", hide = true)]
     pub no_leader: bool,
-    /// Initial prompt for the interactive session, e.g. `kiro "fix the bug"` or `kiro --worktree=feat "create this feature"`.
+    /// Initial prompt for the interactive session, e.g. `fc "fix the bug"` or `fc --worktree=feat "create this feature"`.
     #[arg(
         value_name = "PROMPT",
         conflicts_with_all = &["single",
@@ -820,8 +820,8 @@ impl PagerArgs {
             .map(std::path::Path::new)
             .and_then(|p| p.file_name())
             .and_then(|n| n.to_str())
-            .filter(|n| *n == "kiro" || *n == "grok" || *n == "agent")
-            .unwrap_or("kiro")
+            .filter(|n| *n == "fc" || *n == "kiro" || *n == "grok" || *n == "agent")
+            .unwrap_or("fc")
             .to_owned();
         Self::parse_from(std::iter::once(bin_name).chain(std::env::args().skip(1)))
     }

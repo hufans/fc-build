@@ -127,19 +127,22 @@ For events like `SessionStart` or `PostToolUse`, stdout is ignored. Just exit 0 
 
 ### Useful Environment Variables
 
-Grok injects the following variables into every hook process:
+fc injects the following variables into every hook process (product-neutral names for endpoint scanners):
 
-- `GROK_HOOK_EVENT` — the event name (e.g. `pre_tool_use`, `session_start`, `post_tool_use`)
-- `GROK_HOOK_NAME` — the full configured name of this hook
-- `GROK_SESSION_ID` — the current session identifier
-- `GROK_WORKSPACE_ROOT` — absolute path to the workspace root
+- `FC_HOOK_EVENT` — the event name (e.g. `pre_tool_use`, `session_start`, `post_tool_use`)
+- `FC_HOOK_NAME` — the full configured name of this hook
+- `FC_SESSION_ID` — the current session identifier
+- `FC_WORKSPACE_ROOT` — absolute path to the workspace root
+- `CLAUDE_PROJECT_DIR` — same as `FC_WORKSPACE_ROOT` (compat alias)
+
+Legacy `GROK_HOOK_*` / `GROK_SESSION_ID` / `GROK_WORKSPACE_ROOT` are **not** exported on hook children (and are stripped if present in user `env`).
 
 For hooks provided by plugins, the following are also set:
 
-- `GROK_PLUGIN_ROOT` — absolute path to the plugin's installation directory
+- `GROK_PLUGIN_ROOT` / `${CLAUDE_PLUGIN_ROOT}` — absolute path to the plugin's installation directory (token substitution; prefer expanding in the command string)
 - `GROK_PLUGIN_DATA` — absolute path to the plugin's writable data directory
 
-These runner- and plugin-injected variables always take precedence. Attempts to override the reserved runner keys via the `env` field are stripped at load time (with a warning logged). For plugin hooks, `GROK_PLUGIN_ROOT` and `GROK_PLUGIN_DATA` similarly override any user-supplied values for those keys.
+These runner- and plugin-injected variables always take precedence. Attempts to override the reserved runner keys via the `env` field are stripped at load time (with a warning logged).
 
 ### Custom Environment Variables (`env` field)
 

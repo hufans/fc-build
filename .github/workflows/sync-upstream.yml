@@ -3,12 +3,12 @@
 # Happy path (no conflicts):
 #   1. merge upstream/main into origin/main
 #   2. push main
-#   3. call "Build kiro" via workflow_call → continuous Release
+#   3. call "Build fc" via workflow_call → continuous Release
 #
 # Why workflow_call (not `gh workflow run`)?
 #   GITHUB_TOKEN pushes do not start other workflows, and
-#   `gh workflow run "Build kiro"` failed here with:
-#     could not find any workflows named Build kiro
+#   `gh workflow run "Build fc"` failed here with:
+#     could not find any workflows named Build fc
 #   Calling the reusable workflow in-process needs no SYNC_PAT.
 #
 # Conflicts → open/update a GitHub Issue for manual fix.
@@ -25,7 +25,7 @@ on:
   workflow_dispatch:
     inputs:
       auto_merge:
-        description: "Push clean merge to main and run Build kiro"
+        description: "Push clean merge to main and run Build fc"
         type: boolean
         default: true
 
@@ -98,7 +98,7 @@ jobs:
           if git merge upstream/main -m "chore: sync from upstream $(date -u +%Y-%m-%d)
 
           Merge xai-org/grok-build main into this fork.
-          Keep kiro branding / install / CI / ~/.kiro patches on conflict.
+          Keep fc branding / install / CI / ~/.fc patches on conflict.
           "; then
             echo "conflict=false" >> "$GITHUB_OUTPUT"
             echo "Merge clean."
@@ -135,7 +135,7 @@ jobs:
         run: |
           if [ "${{ steps.push.outputs.pushed }}" = "true" ]; then
             echo "should_build=true" >> "$GITHUB_OUTPUT"
-            echo "### Will run **Build kiro** via workflow_call" >> "$GITHUB_STEP_SUMMARY"
+            echo "### Will run **Build fc** via workflow_call" >> "$GITHUB_STEP_SUMMARY"
           else
             echo "should_build=false" >> "$GITHUB_OUTPUT"
           fi
@@ -161,11 +161,11 @@ jobs:
           git checkout main
           git pull origin main
           git merge upstream/main
-          # resolve conflicts (keep kiro branding / install / CI / ~/.kiro)
+          # resolve conflicts (keep fc branding / install / CI / ~/.fc)
           git push origin main
           \`\`\`
 
-          After push, **Build kiro** should refresh the \`continuous\` Release.
+          After push, **Build fc** should refresh the \`continuous\` Release.
 
           See [KIRO.md](https://github.com/${{ github.repository }}/blob/main/KIRO.md).
           EOF
@@ -180,9 +180,9 @@ jobs:
 
   # Same workflow run → no GITHUB_TOKEN cross-workflow dispatch needed.
   build-and-release:
-    name: Build kiro + continuous
+    name: Build fc + continuous
     needs: sync
     if: needs.sync.outputs.should_build == 'true'
-    uses: ./.github/workflows/build-kiro.yml
+    uses: ./.github/workflows/build-fc.yml
     permissions:
       contents: write

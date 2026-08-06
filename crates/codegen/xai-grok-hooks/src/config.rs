@@ -583,7 +583,10 @@ fn strip_reserved_env_keys(
     spec_name: &str,
     file_path: &Path,
 ) {
-    for reserved in crate::runner::command::RUNNER_ALWAYS_SET_ENV {
+    for reserved in crate::runner::command::RUNNER_ALWAYS_SET_ENV
+        .iter()
+        .chain(crate::runner::command::RUNNER_STRIP_LEGACY_ENV.iter())
+    {
         if extra_env.remove(*reserved).is_some() {
             tracing::warn!(
                 hook = %spec_name,
@@ -1338,6 +1341,10 @@ mod tests {
                                 "type": "command",
                                 "command": "echo hi",
                                 "env": {
+                                    "FC_HOOK_EVENT": "spoofed",
+                                    "FC_HOOK_NAME": "spoofed",
+                                    "FC_SESSION_ID": "spoofed",
+                                    "FC_WORKSPACE_ROOT": "/etc",
                                     "GROK_HOOK_EVENT": "spoofed",
                                     "GROK_HOOK_NAME": "spoofed",
                                     "GROK_SESSION_ID": "spoofed",
@@ -1355,6 +1362,10 @@ mod tests {
         assert!(errors.is_empty(), "unexpected errors: {errors:?}");
         assert_eq!(specs.len(), 1);
         for reserved in [
+            "FC_HOOK_EVENT",
+            "FC_HOOK_NAME",
+            "FC_SESSION_ID",
+            "FC_WORKSPACE_ROOT",
             "GROK_HOOK_EVENT",
             "GROK_HOOK_NAME",
             "GROK_SESSION_ID",

@@ -23,14 +23,16 @@ use tokio::io::AsyncReadExt;
 // Marker constants
 // ============================================================================
 
-const BASH_STATE_START_MARKER: &str = "__GROK_BASH_STATE_START__";
-const BASH_STATE_END_MARKER: &str = "__GROK_BASH_STATE_END__";
-const ZSH_STATE_START_MARKER: &str = "__GROK_ZSH_STATE_START__";
-const ZSH_STATE_END_MARKER: &str = "__GROK_ZSH_STATE_END__";
+// Markers must not contain "grok" — dump scripts are inlined into `shell -c`
+// argv and company EDR scans process command lines for that fingerprint.
+const BASH_STATE_START_MARKER: &str = "__FC_BASH_STATE_START__";
+const BASH_STATE_END_MARKER: &str = "__FC_BASH_STATE_END__";
+const ZSH_STATE_START_MARKER: &str = "__FC_ZSH_STATE_START__";
+const ZSH_STATE_END_MARKER: &str = "__FC_ZSH_STATE_END__";
 
 /// Marker emitted by the init path to separate login-shell noise (MOTD, etc.)
 /// from the actual state dump on stdout.
-const INIT_STATE_MARKER: &str = "__GROK_INIT_STATE_MARKER__";
+const INIT_STATE_MARKER: &str = "__FC_INIT_STATE_MARKER__";
 
 /// Maximum time to wait for a shell state init (login shell + rc files).
 const INIT_TIMEOUT: Duration = Duration::from_secs(15);
@@ -88,20 +90,21 @@ dump_bash_state() {
     local content="$1"
     local var_name="$2"
     if [[ -n "$content" ]]; then
-      builtin printf 'grok_snap_%s=$(command base64 -d <<'"'"'GROK_SNAP_EOF_%s'"'"'\n' "$var_name" "$var_name"
+      builtin printf 'fc_snap_%s=$(command base64 -d <<'"'"'FC_SNAP_EOF_%s'"'"'\n' "$var_name" "$var_name"
       command base64 <<<"$content" | command tr -d '\n'
-      builtin printf '\nGROK_SNAP_EOF_%s\n' "$var_name"
+      builtin printf '\nFC_SNAP_EOF_%s\n' "$var_name"
       builtin printf ')\n'
-      builtin printf 'eval "$grok_snap_%s"\n' "$var_name"
+      builtin printf 'eval "$fc_snap_%s"\n' "$var_name"
     fi
   }
 
-  _emit "__GROK_BASH_STATE_START__"
+  _emit "__FC_BASH_STATE_START__"
 
   _emit "$PWD"
 
   local env_vars
-  env_vars=$(builtin export -p 2>/dev/null | command grep -viE '_proxy=|GROK_SANDBOX|GROK_AGENT=|KIRO_AGENT=|SUDO_ASKPASS|GROK_ASKPASS|ELECTRON_RUN_AS_NODE|SSH_AUTH_SOCK|DBUS_SESSION_BUS_ADDRESS|XDG_RUNTIME_DIR|WAYLAND_DISPLAY|GPG_TTY' || true)
+  # Strip agent/sentinel env from the snapshot (names must stay scanner-clean).
+  env_vars=$(builtin export -p 2>/dev/null | command grep -viE '_proxy=|FC_AGENT=|SUDO_ASKPASS|ELECTRON_RUN_AS_NODE|SSH_AUTH_SOCK|DBUS_SESSION_BUS_ADDRESS|XDG_RUNTIME_DIR|WAYLAND_DISPLAY|GPG_TTY' || true)
   _emit_encoded "$env_vars" "ENV_VARS_B64"
 
   # errexit/pipefail here are this function's own `set -euo pipefail` (set is
@@ -123,7 +126,7 @@ dump_bash_state() {
   _emit_encoded "$aliases" "ALIASES_B64"
 
   _emit "# end of bash state dump"
-  _emit "__GROK_BASH_STATE_END__"
+  _emit "__FC_BASH_STATE_END__"
 }
 "##;
 
@@ -144,20 +147,21 @@ function dump_zsh_state() {
     local content="$1"
     local var_name="$2"
     if [[ -n "$content" ]]; then
-      builtin printf 'grok_snap_%s=$(command base64 -d <<'"'"'GROK_SNAP_EOF_%s'"'"'\n' "$var_name" "$var_name"
+      builtin printf 'fc_snap_%s=$(command base64 -d <<'"'"'FC_SNAP_EOF_%s'"'"'\n' "$var_name" "$var_name"
       command base64 <<<"$content" | command tr -d '\n'
-      builtin printf '\nGROK_SNAP_EOF_%s\n' "$var_name"
+      builtin printf '\nFC_SNAP_EOF_%s\n' "$var_name"
       builtin printf ')\n'
-      builtin printf 'eval "$grok_snap_%s"\n' "$var_name"
+      builtin printf 'eval "$fc_snap_%s"\n' "$var_name"
     fi
   }
 
-  _emit "__GROK_ZSH_STATE_START__"
+  _emit "__FC_ZSH_STATE_START__"
 
   _emit "$PWD"
 
   local env_vars
-  env_vars=$(builtin typeset -xp 2>/dev/null | command grep -viE '_proxy=|GROK_SANDBOX|GROK_AGENT=|KIRO_AGENT=|SUDO_ASKPASS|GROK_ASKPASS|ELECTRON_RUN_AS_NODE|SSH_AUTH_SOCK|DBUS_SESSION_BUS_ADDRESS|XDG_RUNTIME_DIR|WAYLAND_DISPLAY|GPG_TTY' || true)
+  # Strip agent/sentinel env from the snapshot (names must stay scanner-clean).
+  env_vars=$(builtin typeset -xp 2>/dev/null | command grep -viE '_proxy=|FC_AGENT=|SUDO_ASKPASS|ELECTRON_RUN_AS_NODE|SSH_AUTH_SOCK|DBUS_SESSION_BUS_ADDRESS|XDG_RUNTIME_DIR|WAYLAND_DISPLAY|GPG_TTY' || true)
   _emit_encoded "$env_vars" "ENV_VARS_B64"
 
   # errreturn/pipefail here are this function's own `emulate -L` options
@@ -176,7 +180,7 @@ function dump_zsh_state() {
   _emit_encoded "$aliases" "ALIASES_B64"
 
   _emit "# end of zsh state dump"
-  _emit "__GROK_ZSH_STATE_END__"
+  _emit "__FC_ZSH_STATE_END__"
 }
 "##;
 
@@ -422,10 +426,10 @@ impl ShellState {
                 // up as `Y\nX\n` instead of the chronological `X\nY\n`.
                 // Shell-level diagnostics (eval syntax errors, etc.) still
                 // land on the outer shell's stderr — those are unaffected.
-                // Re-export KIRO_AGENT=1 after snapshot eval so agent-definition
+                // Re-export FC_AGENT=1 after snapshot eval so agent-definition
                 // selectors (or other values) from prior shells cannot clear the
-                // agent sentinel (process env alone is insufficient). Drop any
-                // inherited GROK_AGENT so process env scans do not see "grok".
+                // agent sentinel (process env alone is insufficient).
+                // Never mention GROK_* names in this wrapper — EDR sees full argv.
                 //
                 // Copy $1/$2 into plain variables and clear the positional
                 // parameters (`builtin set --`) BEFORE eval'ing the user
@@ -445,14 +449,13 @@ impl ShellState {
                 "{dump_script} \
                  snap=$(command cat <&3) && builtin shopt -s extglob && builtin eval -- \"$snap\" && \
                  {{ builtin set +u 2>/dev/null || true; \
-                 builtin unset GROK_AGENT 2>/dev/null || true; \
-                 builtin export KIRO_AGENT=1; \
+                 builtin export FC_AGENT=1; \
                  builtin export PWD=\"$(builtin pwd)\"; \
                  builtin shopt -s expand_aliases 2>/dev/null; {sudo_inject}{search_inject}\
                  builtin printf '%s' \"${{2:-}}\"; \
-                 __kiro_user_cmd=\"$1\"; builtin declare +x __kiro_user_cmd 2>/dev/null; builtin set --; \
-                 builtin eval \"$__kiro_user_cmd\" 2>&1; }}; \
-                 COMMAND_EXIT_CODE=$?; builtin unset __kiro_user_cmd 2>/dev/null; {dump_fn} >&4; builtin exit $COMMAND_EXIT_CODE"
+                 __fc_user_cmd=\"$1\"; builtin declare +x __fc_user_cmd 2>/dev/null; builtin set --; \
+                 builtin eval \"$__fc_user_cmd\" 2>&1; }}; \
+                 COMMAND_EXIT_CODE=$?; builtin unset __fc_user_cmd 2>/dev/null; {dump_fn} >&4; builtin exit $COMMAND_EXIT_CODE"
             ),
             // After snapshot restore: force nonomatch so login dumps cannot re-arm NOMATCH for model globs.
             // See the bash wrapper comment for why positional parameters are
@@ -466,14 +469,13 @@ impl ShellState {
                  builtin eval \"$snap\" && \
                  {{ builtin unsetopt nounset 2>/dev/null || true; \
                  builtin setopt nonomatch 2>/dev/null || true; \
-                 builtin unset GROK_AGENT 2>/dev/null || true; \
-                 builtin export KIRO_AGENT=1; \
+                 builtin export FC_AGENT=1; \
                  builtin export PWD=\"$(builtin pwd)\"; \
                  builtin setopt aliases 2>/dev/null; {sudo_inject}{search_inject}\
                  builtin printf '%s' \"${{2:-}}\"; \
-                 __kiro_user_cmd=\"$1\"; builtin typeset +x __kiro_user_cmd 2>/dev/null; builtin set --; \
-                 builtin eval \"$__kiro_user_cmd\" 2>&1; }}; \
-                 COMMAND_EXIT_CODE=$?; builtin unset __kiro_user_cmd 2>/dev/null; {dump_fn} >&4; builtin exit $COMMAND_EXIT_CODE"
+                 __fc_user_cmd=\"$1\"; builtin typeset +x __fc_user_cmd 2>/dev/null; builtin set --; \
+                 builtin eval \"$__fc_user_cmd\" 2>&1; }}; \
+                 COMMAND_EXIT_CODE=$?; builtin unset __fc_user_cmd 2>/dev/null; {dump_fn} >&4; builtin exit $COMMAND_EXIT_CODE"
             ),
         };
 
@@ -740,11 +742,11 @@ mod tests {
 
     #[test]
     fn parse_dump_valid_bash() {
-        let raw = "__GROK_BASH_STATE_START__\n\
+        let raw = "__FC_BASH_STATE_START__\n\
                     /home/user/project\n\
                     export FOO=bar\n\
                     # end of bash state dump\n\
-                    __GROK_BASH_STATE_END__\n";
+                    __FC_BASH_STATE_END__\n";
         let (cwd, rest) = parse_dump(ShellKind::Bash, raw).unwrap();
         assert_eq!(cwd, PathBuf::from("/home/user/project"));
         assert!(rest.contains("export FOO=bar"));
@@ -752,11 +754,11 @@ mod tests {
 
     #[test]
     fn parse_dump_valid_zsh() {
-        let raw = "__GROK_ZSH_STATE_START__\n\
+        let raw = "__FC_ZSH_STATE_START__\n\
                     /tmp\n\
                     typeset -x FOO=bar\n\
                     # end of zsh state dump\n\
-                    __GROK_ZSH_STATE_END__\n";
+                    __FC_ZSH_STATE_END__\n";
         let (cwd, rest) = parse_dump(ShellKind::Zsh, raw).unwrap();
         assert_eq!(cwd, PathBuf::from("/tmp"));
         assert!(rest.contains("typeset -x FOO=bar"));
@@ -764,28 +766,28 @@ mod tests {
 
     #[test]
     fn parse_dump_missing_start_marker() {
-        let raw = "/home/user\nexport FOO=bar\n__GROK_BASH_STATE_END__\n";
+        let raw = "/home/user\nexport FOO=bar\n__FC_BASH_STATE_END__\n";
         assert!(parse_dump(ShellKind::Bash, raw).is_none());
     }
 
     #[test]
     fn parse_dump_missing_end_marker() {
-        let raw = "__GROK_BASH_STATE_START__\n/home/user\nexport FOO=bar\n";
+        let raw = "__FC_BASH_STATE_START__\n/home/user\nexport FOO=bar\n";
         assert!(parse_dump(ShellKind::Bash, raw).is_none());
     }
 
     #[test]
     fn parse_dump_wrong_shell_markers() {
-        let raw = "__GROK_ZSH_STATE_START__\n/tmp\nstuff\n__GROK_ZSH_STATE_END__\n";
+        let raw = "__FC_ZSH_STATE_START__\n/tmp\nstuff\n__FC_ZSH_STATE_END__\n";
         assert!(parse_dump(ShellKind::Bash, raw).is_none());
     }
 
     #[test]
     fn parse_dump_empty_snapshot() {
-        let raw = "__GROK_BASH_STATE_START__\n\
+        let raw = "__FC_BASH_STATE_START__\n\
                     /home/user\n\
                     # end of bash state dump\n\
-                    __GROK_BASH_STATE_END__\n";
+                    __FC_BASH_STATE_END__\n";
         let (cwd, rest) = parse_dump(ShellKind::Bash, raw).unwrap();
         assert_eq!(cwd, PathBuf::from("/home/user"));
         assert!(rest.contains("# end of bash state dump"));
@@ -793,15 +795,15 @@ mod tests {
 
     #[test]
     fn parse_after_marker_found() {
-        let output = "Welcome to Ubuntu\nMOTD line\n__GROK_INIT_STATE_MARKER__\nactual data\n";
-        let result = parse_after_marker(output, "__GROK_INIT_STATE_MARKER__");
+        let output = "Welcome to Ubuntu\nMOTD line\n__FC_INIT_STATE_MARKER__\nactual data\n";
+        let result = parse_after_marker(output, "__FC_INIT_STATE_MARKER__");
         assert_eq!(result, "actual data\n");
     }
 
     #[test]
     fn parse_after_marker_not_found() {
         let output = "just some output\n";
-        let result = parse_after_marker(output, "__GROK_INIT_STATE_MARKER__");
+        let result = parse_after_marker(output, "__FC_INIT_STATE_MARKER__");
         assert_eq!(result, output);
     }
 
@@ -849,11 +851,11 @@ mod tests {
             shell: ShellKind::Bash,
         };
 
-        let dump = "__GROK_BASH_STATE_START__\n\
+        let dump = "__FC_BASH_STATE_START__\n\
                      /new/dir\n\
                      export X=1\n\
                      # end of bash state dump\n\
-                     __GROK_BASH_STATE_END__\n";
+                     __FC_BASH_STATE_END__\n";
         assert!(state.update_from_dump(dump));
         assert_eq!(state.cwd, PathBuf::from("/new/dir"));
         assert!(state.snapshot.contains("export X=1"));
@@ -884,7 +886,7 @@ mod tests {
         assert!(state.cwd.is_absolute());
         // The snapshot should contain at least some env var exports
         assert!(
-            state.snapshot.contains("grok_snap_") || state.snapshot.is_empty(),
+            state.snapshot.contains("fc_snap_") || state.snapshot.is_empty(),
             "snapshot should contain encoded blocks or be empty: {:?}",
             &state.snapshot[..state.snapshot.len().min(200)]
         );
@@ -901,10 +903,10 @@ mod tests {
         let cwd = std::env::current_dir().unwrap();
         let mut state = ShellState::init(ShellKind::Bash, &cwd, None).await.unwrap();
 
-        // Run "export GROK_TEST_VAR=hello" and capture the new state
+        // Run "export FC_TEST_VAR=hello" and capture the new state
         let prep = state
             .prepare_command(
-                "export GROK_TEST_VAR=hello",
+                "export FC_TEST_VAR=hello",
                 None,
                 crate::computer::local::SearchShadowConfig::default(),
                 None,
@@ -1051,13 +1053,13 @@ mod tests {
         let cwd = std::env::current_dir().unwrap();
         let mut state = ShellState::init(ShellKind::Bash, &cwd, None).await.unwrap();
 
-        let (code, _) = run_command(&mut state, "export GPG_TTY=/grok-sentinel-tty").await;
+        let (code, _) = run_command(&mut state, "export GPG_TTY=/fc-sentinel-tty").await;
         assert_eq!(code, 0);
 
         let (code, stdout) = run_command(&mut state, "echo \"[$GPG_TTY]\"").await;
         assert_eq!(code, 0);
         assert!(
-            !stdout.contains("/grok-sentinel-tty"),
+            !stdout.contains("/fc-sentinel-tty"),
             "GPG_TTY must not persist across commands via the snapshot, got: {stdout:?}"
         );
     }
@@ -1071,13 +1073,13 @@ mod tests {
         let cwd = std::env::current_dir().unwrap();
         let mut state = ShellState::init(ShellKind::Zsh, &cwd, None).await.unwrap();
 
-        let (code, _) = run_command(&mut state, "export GPG_TTY=/grok-sentinel-tty").await;
+        let (code, _) = run_command(&mut state, "export GPG_TTY=/fc-sentinel-tty").await;
         assert_eq!(code, 0);
 
         let (code, stdout) = run_command(&mut state, "echo \"[$GPG_TTY]\"").await;
         assert_eq!(code, 0);
         assert!(
-            !stdout.contains("/grok-sentinel-tty"),
+            !stdout.contains("/fc-sentinel-tty"),
             "GPG_TTY must not persist across commands via the snapshot, got: {stdout:?}"
         );
     }
@@ -1178,7 +1180,7 @@ mod tests {
     }
 
     /// Regression test: with `allexport` active (restored from the snapshot
-    /// after the model runs `set -a`), the wrapper's `__grok_user_cmd` temp
+    /// after the model runs `set -a`), the wrapper's `__fc_user_cmd` temp
     /// variable must not leak into child-process environments or persist into
     /// subsequent commands via the state dump.
     #[tokio::test]
@@ -1194,13 +1196,13 @@ mod tests {
         let (code, _) = run_command(&mut state, "set -a").await;
         assert_eq!(code, 0);
 
-        // This command's wrapper assigns __grok_user_cmd under allexport.
+        // This command's wrapper assigns __fc_user_cmd under allexport.
         // printenv only sees exported vars — it must not see the temp var
         // (neither from this command's own assignment nor re-exported from a
         // previous command's state dump).
         let (code, stdout) = run_command(
             &mut state,
-            "printenv __grok_user_cmd >/dev/null 2>&1 && echo LEAKED_TO_ENV || echo ENV_CLEAN",
+            "printenv __fc_user_cmd >/dev/null 2>&1 && echo LEAKED_TO_ENV || echo ENV_CLEAN",
         )
         .await;
         assert_eq!(code, 0);

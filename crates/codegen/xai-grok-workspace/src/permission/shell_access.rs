@@ -518,9 +518,13 @@ fn protected_grok_config_file_with_home(
         Some("sandbox.toml") => ProtectedEditReason::GrokSandbox,
         _ => return None,
     };
-    let in_dot_grok = components.len() >= 2 && components[components.len() - 2] == ".grok";
+    let in_project_cfg = components.len() >= 2
+        && matches!(
+            components[components.len() - 2],
+            ".fc" | ".grok" | ".kiro"
+        );
     let in_grok_home = || grok_home_matches(user_grok_home, |home| path.parent() == Some(home));
-    (in_dot_grok || in_grok_home()).then_some(reason)
+    (in_project_cfg || in_grok_home()).then_some(reason)
 }
 
 /// True when `pred` holds for the user grok home in either its lexical or
@@ -541,8 +545,14 @@ fn path_is_under_user_grok_hook_root(path: &Path, grok_home: &Path) -> bool {
 }
 
 fn protected_grok_hook_root(path: &Path, components: &[&str]) -> bool {
-    components.windows(2).any(|pair| pair == [".grok", "hooks"])
+    components.windows(2).any(|pair| {
+        matches!(
+            pair,
+            [".fc", "hooks"] | [".grok", "hooks"] | [".kiro", "hooks"]
+        )
+    }) || components.ends_with(&[".fc", "hooks-paths"])
         || components.ends_with(&[".grok", "hooks-paths"])
+        || components.ends_with(&[".kiro", "hooks-paths"])
         || grok_home_matches(xai_grok_config::user_grok_home().as_deref(), |home| {
             path_is_under_user_grok_hook_root(path, home)
         })

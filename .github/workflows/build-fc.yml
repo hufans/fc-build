@@ -1,11 +1,11 @@
-# Build the kiro CLI on every merge/push to main (and on PRs / manual run).
+# Build the fc CLI on every merge/push to main (and on PRs / manual run).
 # Artifacts are uploaded for download from the Actions run page.
 #
 # Also callable via workflow_call from "Sync upstream" so a GITHUB_TOKEN
 # merge can still publish continuous without relying on workflow_dispatch
 # (which is flaky / blocked for GITHUB_TOKEN).
 
-name: Build kiro
+name: Build fc
 
 on:
   push:
@@ -16,7 +16,7 @@ on:
   workflow_call:
 
 concurrency:
-  group: build-kiro-${{ github.workflow }}-${{ github.ref }}
+  group: build-fc-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 env:
@@ -34,11 +34,11 @@ jobs:
       matrix:
         include:
           - os: ubuntu-latest
-            artifact: kiro-linux-x86_64
-            bin_name: kiro
+            artifact: fc-linux-x86_64
+            bin_name: fc
           - os: macos-14
-            artifact: kiro-darwin-arm64
-            bin_name: kiro
+            artifact: fc-darwin-arm64
+            bin_name: fc
           # macos-13 (Intel) free runners often queue for hours and block
           # the continuous release. Build Intel locally or re-add later.
 
@@ -93,12 +93,12 @@ jobs:
       - name: Cache cargo
         uses: Swatinem/rust-cache@v2
         with:
-          shared-key: kiro-release
+          shared-key: fc-release
           # Cache deps; still recompile the workspace on source changes.
           cache-targets: true
 
-      - name: Build release kiro
-        run: cargo build -p xai-grok-pager-bin --release --bin kiro
+      - name: Build release fc
+        run: cargo build -p xai-grok-pager-bin --release --bin fc
 
       - name: Smoke test
         run: |
@@ -161,27 +161,27 @@ jobs:
           mkdir -p dist
           for dir in artifacts/*/; do
             [ -d "$dir" ] || continue
-            find "$dir" -type f -maxdepth 1 \( -name 'kiro-*' ! -name '*.txt' \) -exec cp -f {} dist/ \;
+            find "$dir" -type f -maxdepth 1 \( -name 'fc-*' ! -name '*.txt' \) -exec cp -f {} dist/ \;
           done
           ls -lh dist/ || true
           count=0
           files=()
-          for f in dist/kiro-*; do
+          for f in dist/fc-*; do
             [ -f "$f" ] || continue
             chmod +x "$f"
             files+=("$f")
             count=$((count + 1))
           done
           if [ "$count" -eq 0 ]; then
-            echo "No kiro binaries to publish"
+            echo "No fc binaries to publish"
             exit 1
           fi
           # Primary platforms should be present for a healthy release
-          for need in kiro-linux-x86_64 kiro-darwin-arm64; do
+          for need in fc-linux-x86_64 fc-darwin-arm64; do
             test -f "dist/$need" || { echo "missing required $need"; exit 1; }
           done
           {
-            echo "Kiro continuous build"
+            echo "fc continuous build"
             echo
             echo "- commit: \`${{ github.sha }}\`"
             echo "- run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
@@ -201,9 +201,9 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: continuous
-          name: Kiro continuous
+          name: fc continuous
           body_path: dist/RELEASE_NOTES.md
-          files: dist/kiro-*
+          files: dist/fc-*
           fail_on_unmatched_files: true
           make_latest: true
         env:

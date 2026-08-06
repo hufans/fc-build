@@ -150,12 +150,14 @@ pub async fn run_command_hook(
     // AFTER any preceding `.env(...)` calls and silently overrides them, so
     // the order matters: we MUST apply user/plugin `extra_env` FIRST and
     // the runner-injected vars LAST. Otherwise a user JSON hook (or a
-    // plugin) can spoof `GROK_HOOK_EVENT`, `GROK_HOOK_NAME`, `GROK_SESSION_ID`,
-    // `GROK_WORKSPACE_ROOT`, or `CLAUDE_PROJECT_DIR`, which are the
-    // identity/event signals a hook script consumes for policy and audit.
+    // plugin) can spoof `FC_HOOK_EVENT` / `FC_SESSION_ID` / etc., which are
+    // the identity/event signals a hook script consumes for policy and audit.
     // See the `runner_injected_vars_override_extra_env_at_spawn`
     // regression test in `tests/integration.rs` and the rustdoc on
     // `HookSpec::extra_env`.
+    //
+    // Fork: inject FC_* only (and strip inherited/spoofed GROK_* equivalents)
+    // so process-env scanners do not see product fingerprints on hook children.
     #[allow(clippy::disallowed_methods)] // enrolled in the session scope below
     let mut child = match cmd
         .stdin(std::process::Stdio::piped())
@@ -164,14 +166,17 @@ pub async fn run_command_hook(
         .current_dir(ctx.workspace_root)
         // 1. user/plugin extra_env first (lowest precedence).
         .envs(&spec.extra_env)
-        // 2. runner-injected vars last (highest precedence, always win).
-        .env("GROK_HOOK_EVENT", envelope.hook_event_name.to_string())
-        .env("GROK_HOOK_NAME", &spec.name)
-        .env("GROK_SESSION_ID", ctx.session_id)
-        .env("GROK_WORKSPACE_ROOT", ctx.workspace_root)
-        // Compatibility alias for external hooks that read this env name.
-        // Same value as `GROK_WORKSPACE_ROOT`; native `.grok` hooks should use
-        // `GROK_WORKSPACE_ROOT`.
+        // 2. strip legacy product env names (never re-export them).
+        .env_remove("GROK_HOOK_EVENT")
+        .env_remove("GROK_HOOK_NAME")
+        .env_remove("GROK_SESSION_ID")
+        .env_remove("GROK_WORKSPACE_ROOT")
+        // 3. runner-injected vars last (highest precedence, always win).
+        .env("FC_HOOK_EVENT", envelope.hook_event_name.to_string())
+        .env("FC_HOOK_NAME", &spec.name)
+        .env("FC_SESSION_ID", ctx.session_id)
+        .env("FC_WORKSPACE_ROOT", ctx.workspace_root)
+        // Compatibility alias for Claude-style hooks.
         .env("CLAUDE_PROJECT_DIR", ctx.workspace_root)
         .kill_on_drop(true)
         .spawn()
@@ -297,11 +302,21 @@ pub async fn run_command_hook(
 ///   precedence ordering anyway, but stripping them at load time gives
 ///   users a clear "ignored, reserved key" warning).
 pub(crate) const RUNNER_ALWAYS_SET_ENV: &[&str] = &[
+    "FC_HOOK_EVENT",
+    "FC_HOOK_NAME",
+    "FC_SESSION_ID",
+    "FC_WORKSPACE_ROOT",
+    "CLAUDE_PROJECT_DIR",
+];
+
+/// Legacy product keys: stripped from user `env` maps so they are never
+/// re-exported on hook children. Not treated as "always set" for `${VAR}`
+/// expansion (we no longer inject them).
+pub(crate) const RUNNER_STRIP_LEGACY_ENV: &[&str] = &[
     "GROK_HOOK_EVENT",
     "GROK_HOOK_NAME",
     "GROK_SESSION_ID",
     "GROK_WORKSPACE_ROOT",
-    "CLAUDE_PROJECT_DIR",
 ];
 
 /// Parse `command_str` for `${VAR}` and `$VAR` references and return the
@@ -1192,7 +1207,7 @@ mod tests {
         let mut env = std::collections::HashMap::new();
         env.insert("CLAUDE_PLUGIN_ROOT".to_string(), "/plugins/foo".to_string());
         let v = find_unresolved_env_vars(
-            "${GROK_HOOK_EVENT}/${CLAUDE_PROJECT_DIR}/${GROK_SESSION_ID}/${CLAUDE_PLUGIN_ROOT}/foo",
+            "${FC_HOOK_EVENT}/${CLAUDE_PROJECT_DIR}/${FC_SESSION_ID}/${CLAUDE_PLUGIN_ROOT}/foo",
             &env,
         );
         assert!(

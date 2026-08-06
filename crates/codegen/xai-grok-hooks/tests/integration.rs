@@ -466,20 +466,16 @@ async fn new_event_types_fire_and_receive_correct_envelope() {
 }
 
 /// Regression: a user JSON hook that declares `env` values for
-/// runner-reserved keys (`GROK_HOOK_EVENT`, `GROK_HOOK_NAME`,
-/// `GROK_SESSION_ID`, `GROK_WORKSPACE_ROOT`, `CLAUDE_PROJECT_DIR`)
-/// must NOT spoof those values inside the spawned child. The
-/// runner-injected vars always win at spawn time. This test
-/// constructs the spoof JSON, dispatches a hook that writes `printenv`
-/// for each key, and asserts the captured values are the runner's
-/// authentic ones.
+/// runner-reserved keys (`FC_HOOK_*` / legacy `GROK_HOOK_*` /
+/// `CLAUDE_PROJECT_DIR`) must NOT spoof those values inside the spawned
+/// child. The runner-injected vars always win at spawn time.
 #[tokio::test]
 async fn runner_injected_vars_override_extra_env_at_spawn() {
     let dir = tempfile::tempdir().unwrap();
     let output_file = dir.path().join("envcap.txt");
 
     let cmd = format!(
-        r#"echo "EVENT=$GROK_HOOK_EVENT" > {f}; echo "NAME=$GROK_HOOK_NAME" >> {f}; echo "SESSION=$GROK_SESSION_ID" >> {f}; echo "ROOT=$GROK_WORKSPACE_ROOT" >> {f}; echo "PROJ=$CLAUDE_PROJECT_DIR" >> {f}; echo "USER_KEY=$USER_KEY" >> {f}; echo '{{"decision":"allow"}}'"#,
+        r#"echo "EVENT=$FC_HOOK_EVENT" > {f}; echo "NAME=$FC_HOOK_NAME" >> {f}; echo "SESSION=$FC_SESSION_ID" >> {f}; echo "ROOT=$FC_WORKSPACE_ROOT" >> {f}; echo "PROJ=$CLAUDE_PROJECT_DIR" >> {f}; echo "USER_KEY=$USER_KEY" >> {f}; (printenv GROK_HOOK_EVENT >/dev/null 2>&1 && echo LEGACY_SET || echo LEGACY_UNSET) >> {f}; echo '{{"decision":"allow"}}'"#,
         f = output_file.display(),
     );
 
@@ -494,6 +490,10 @@ async fn runner_injected_vars_override_extra_env_at_spawn() {
                             // Spoof every reserved key + add a non-reserved one
                             // that should be preserved.
                             "env": {
+                                "FC_HOOK_EVENT": "spoofed_event",
+                                "FC_HOOK_NAME": "spoofed_name",
+                                "FC_SESSION_ID": "spoofed_session",
+                                "FC_WORKSPACE_ROOT": "/spoofed/root",
                                 "GROK_HOOK_EVENT": "spoofed_event",
                                 "GROK_HOOK_NAME": "spoofed_name",
                                 "GROK_SESSION_ID": "spoofed_session",
@@ -528,27 +528,27 @@ async fn runner_injected_vars_override_extra_env_at_spawn() {
     let captured = std::fs::read_to_string(&output_file).unwrap();
     assert!(
         captured.contains("EVENT=pre_tool_use"),
-        "GROK_HOOK_EVENT must reflect the real event, got:\n{captured}"
+        "FC_HOOK_EVENT must reflect the real event, got:\n{captured}"
     );
     assert!(
         !captured.contains("EVENT=spoofed_event"),
-        "spoofed GROK_HOOK_EVENT must NOT leak through, got:\n{captured}"
+        "spoofed FC_HOOK_EVENT must NOT leak through, got:\n{captured}"
     );
     assert!(
         captured.contains(&format!("SESSION={real_session}")),
-        "GROK_SESSION_ID must reflect the real session, got:\n{captured}"
+        "FC_SESSION_ID must reflect the real session, got:\n{captured}"
     );
     assert!(
         !captured.contains("SESSION=spoofed_session"),
-        "spoofed GROK_SESSION_ID must NOT leak through"
+        "spoofed FC_SESSION_ID must NOT leak through"
     );
     assert!(
         captured.contains(&format!("ROOT={real_workspace}")),
-        "GROK_WORKSPACE_ROOT must reflect the real workspace root, got:\n{captured}"
+        "FC_WORKSPACE_ROOT must reflect the real workspace root, got:\n{captured}"
     );
     assert!(
         !captured.contains("ROOT=/spoofed/root"),
-        "spoofed GROK_WORKSPACE_ROOT must NOT leak through"
+        "spoofed FC_WORKSPACE_ROOT must NOT leak through"
     );
     assert!(
         captured.contains(&format!("PROJ={real_workspace}")),
@@ -561,6 +561,10 @@ async fn runner_injected_vars_override_extra_env_at_spawn() {
     assert!(
         captured.contains("USER_KEY=user_value_kept"),
         "non-reserved user-declared env keys must pass through, got:\n{captured}"
+    );
+    assert!(
+        captured.contains("LEGACY_UNSET"),
+        "legacy GROK_HOOK_EVENT must not be set on hook children, got:\n{captured}"
     );
 }
 

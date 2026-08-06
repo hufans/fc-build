@@ -1,20 +1,20 @@
 #!/usr/bin/env bash
 #
-# Kiro one-line installer
+# fc one-line installer
 #
 #   curl -fsSL https://raw.githubusercontent.com/hufans/kiro-build/main/scripts/install.sh | bash
 #
 # Optional env:
-#   KIRO_REPO     GitHub owner/repo (default: hufans/kiro-build)
-#   KIRO_TAG      Release tag (default: continuous)
-#   KIRO_BIN_DIR  Install directory (default: ~/.local/bin)
-#   KIRO_VERSION  Pin a specific release tag instead of KIRO_TAG
+#   FC_REPO     GitHub owner/repo (default: hufans/kiro-build)
+#   FC_TAG      Release tag (default: continuous)
+#   FC_BIN_DIR  Install directory (default: ~/.local/bin)
+#   FC_VERSION  Pin a specific release tag instead of FC_TAG
 #
 set -euo pipefail
 
-REPO="${KIRO_REPO:-hufans/kiro-build}"
-TAG="${KIRO_VERSION:-${KIRO_TAG:-continuous}}"
-BIN_DIR="${KIRO_BIN_DIR:-$HOME/.local/bin}"
+REPO="${FC_REPO:-hufans/kiro-build}"
+TAG="${FC_VERSION:-${FC_TAG:-continuous}}"
+BIN_DIR="${FC_BIN_DIR:-$HOME/.local/bin}"
 BASE_URL="https://github.com/${REPO}/releases/download/${TAG}"
 
 info() { printf '%s\n' "$*" >&2; }
@@ -51,35 +51,35 @@ case "$arch" in
   *) die "unsupported architecture: $arch" ;;
 esac
 
-# Match CI artifact names in .github/workflows/build-kiro.yml
+# Match CI artifact names in .github/workflows/build-fc.yml
 case "${os_name}-${arch_name}" in
-  darwin-arm64)  artifact="kiro-darwin-arm64" ;;
+  darwin-arm64)  artifact="fc-darwin-arm64" ;;
   darwin-x86_64)
     die "Intel Mac (x86_64) binaries are not published in continuous releases yet.
   Build from source on this machine:
     git clone https://github.com/${REPO}.git && cd kiro-build
-    cargo build -p xai-grok-pager-bin --release --bin kiro
-    install -m 755 target/release/kiro ~/.local/bin/kiro"
+    cargo build -p xai-grok-pager-bin --release --bin fc
+    install -m 755 target/release/fc ~/.local/bin/fc"
     ;;
-  linux-x86_64)  artifact="kiro-linux-x86_64" ;;
+  linux-x86_64)  artifact="fc-linux-x86_64" ;;
   linux-arm64)   die "linux arm64 builds are not published yet" ;;
   *)             die "no binary for ${os_name}-${arch_name}" ;;
 esac
 
 url="${BASE_URL}/${artifact}"
-info "Installing kiro (${os_name}-${arch_name})"
+info "Installing fc (${os_name}-${arch_name})"
 info "  source: ${url}"
 
-tmpdir="$(mktemp -d 2>/dev/null || mktemp -d -t kiro-install)"
+tmpdir="$(mktemp -d 2>/dev/null || mktemp -d -t fc-install)"
 cleanup() { rm -rf "$tmpdir"; }
 trap cleanup EXIT
 
-tmp_bin="${tmpdir}/kiro"
+tmp_bin="${tmpdir}/fc"
 if ! download "$url" "$tmp_bin"; then
   die "download failed.
   • Check that release '${TAG}' exists: https://github.com/${REPO}/releases
   • Wait for CI to publish after a merge to main
-  • Or build from source: cargo build -p xai-grok-pager-bin --release --bin kiro"
+  • Or build from source: cargo build -p xai-grok-pager-bin --release --bin fc"
 fi
 
 # GitHub sometimes returns HTML error pages with HTTP 200 via CDN edge cases
@@ -89,12 +89,12 @@ fi
 
 chmod +x "$tmp_bin"
 if ! "$tmp_bin" --version </dev/null >/dev/null 2>&1; then
-  die "downloaded file is not a runnable kiro binary for this machine"
+  die "downloaded file is not a runnable fc binary for this machine"
 fi
 
 version_line="$("$tmp_bin" --version 2>/dev/null | head -n1 || true)"
 mkdir -p "$BIN_DIR"
-dest="${BIN_DIR}/kiro"
+dest="${BIN_DIR}/fc"
 # Atomic-ish replace
 mv -f "$tmp_bin" "$dest"
 chmod +x "$dest"
@@ -104,21 +104,21 @@ if [ -n "$version_line" ]; then
   info "  version:   ${version_line}"
 fi
 
-# Mark this install as kiro-managed so `kiro update` uses continuous Releases
-# instead of the official x.ai CDN. Config lives under ~/.kiro (not ~/.grok)
+# Mark this install as fc-managed so `fc update` uses continuous Releases
+# instead of the official x.ai CDN. Config lives under ~/.fc (not ~/.grok)
 # to avoid home-dir path fingerprints used by endpoint scanners.
-KIRO_HOME_DIR="${KIRO_HOME:-${HOME}/.kiro}"
-CONFIG_FILE="${KIRO_HOME_DIR}/config.toml"
-mkdir -p "${KIRO_HOME_DIR}"
+FC_HOME_DIR="${FC_HOME:-${HOME}/.fc}"
+CONFIG_FILE="${FC_HOME_DIR}/config.toml"
+mkdir -p "${FC_HOME_DIR}"
 # One-time seed of login/config from official ~/.grok when present.
 if [ -d "${HOME}/.grok" ] && [ ! -f "${CONFIG_FILE}" ] && [ -f "${HOME}/.grok/config.toml" ]; then
   cp "${HOME}/.grok/config.toml" "${CONFIG_FILE}" 2>/dev/null || true
 fi
-if [ -d "${HOME}/.grok" ] && [ ! -f "${KIRO_HOME_DIR}/auth.json" ] && [ -f "${HOME}/.grok/auth.json" ]; then
-  cp "${HOME}/.grok/auth.json" "${KIRO_HOME_DIR}/auth.json" 2>/dev/null || true
+if [ -d "${HOME}/.grok" ] && [ ! -f "${FC_HOME_DIR}/auth.json" ] && [ -f "${HOME}/.grok/auth.json" ]; then
+  cp "${HOME}/.grok/auth.json" "${FC_HOME_DIR}/auth.json" 2>/dev/null || true
 fi
 if [ ! -f "$CONFIG_FILE" ]; then
-  printf '[cli]\ninstaller = "kiro"\n' > "$CONFIG_FILE"
+  printf '[cli]\ninstaller = "fc"\n' > "$CONFIG_FILE"
 elif grep -q '^\[cli\]' "$CONFIG_FILE" 2>/dev/null; then
   if grep -q '^[[:space:]]*installer[[:space:]]*=' "$CONFIG_FILE" 2>/dev/null; then
     # replace existing installer line inside [cli] block only (best-effort)
@@ -126,18 +126,18 @@ elif grep -q '^\[cli\]' "$CONFIG_FILE" 2>/dev/null; then
     awk '
       /^\[cli\][[:space:]]*(#.*)?$/ { print; in_cli=1; next }
       /^\[/ { in_cli=0 }
-      in_cli && /^[[:space:]]*installer[[:space:]]*=/ { print "installer = \"kiro\""; next }
+      in_cli && /^[[:space:]]*installer[[:space:]]*=/ { print "installer = \"fc\""; next }
       { print }
     ' "$CONFIG_FILE" > "$tmp" && mv "$tmp" "$CONFIG_FILE"
   else
     tmp="${CONFIG_FILE}.tmp.$$"
     awk '
-      /^\[cli\][[:space:]]*(#.*)?$/ { print; print "installer = \"kiro\""; next }
+      /^\[cli\][[:space:]]*(#.*)?$/ { print; print "installer = \"fc\""; next }
       { print }
     ' "$CONFIG_FILE" > "$tmp" && mv "$tmp" "$CONFIG_FILE"
   fi
 else
-  printf '\n[cli]\ninstaller = "kiro"\n' >> "$CONFIG_FILE"
+  printf '\n[cli]\ninstaller = "fc"\n' >> "$CONFIG_FILE"
 fi
 
 # PATH hint
@@ -148,7 +148,7 @@ esac
 
 if [ "$path_has_bin_dir" = true ]; then
   info ""
-  info "Done. Run:  kiro"
+  info "Done. Run:  fc"
 else
   shell_name="$(basename "${SHELL:-}")"
   case "$shell_name" in

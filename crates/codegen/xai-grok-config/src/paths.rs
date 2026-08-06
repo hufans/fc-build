@@ -1,9 +1,9 @@
-//! Filesystem locations for kiro (fork) / grok config files and binaries.
+//! Filesystem locations for the `fc` fork / official CLI config and binaries.
 //!
-//! Kiro defaults to `~/.kiro` and `$KIRO_HOME` so endpoint scanners that
-//! blocklist `~/.grok` / process paths containing `grok` do not light up.
-//! Login and config are still the same on-disk formats; existing `~/.grok`
-//! credentials are copied into `~/.kiro` once on first launch.
+//! Defaults to `~/.fc` and `$FC_HOME` so endpoint scanners that blocklist
+//! `~/.grok` / `~/.kiro` path fingerprints do not light up. Login and config
+//! keep the same on-disk formats; existing `~/.kiro` / `~/.grok` credentials
+//! are copied into `~/.fc` once on first launch.
 
 use std::path::{Path, PathBuf};
 use std::sync::OnceLock;
@@ -16,16 +16,21 @@ const CLAUDE_MANAGED_SETTINGS_PATH: &str =
 #[cfg(target_os = "linux")]
 const CLAUDE_MANAGED_SETTINGS_PATH: &str = "/etc/claude-code/managed-settings.json";
 
-/// Dir name under `$HOME` for this fork (avoids the `grok` path fingerprint).
-pub const DEFAULT_HOME_DIRNAME: &str = ".kiro";
+/// Dir name under `$HOME` for this fork (short, non-product path fingerprint).
+pub const DEFAULT_HOME_DIRNAME: &str = ".fc";
+
+/// Previous fork home dir — only used to seed credentials into
+/// [`DEFAULT_HOME_DIRNAME`].
+pub const PRIOR_FORK_HOME_DIRNAME: &str = ".kiro";
 
 /// Official CLI home dir name — only used to seed credentials into
 /// [`DEFAULT_HOME_DIRNAME`].
 pub const LEGACY_HOME_DIRNAME: &str = ".grok";
 
-/// Resolve `$KIRO_HOME` first, then `$GROK_HOME` (compat).
+/// Resolve `$FC_HOME` first, then prior fork / official overrides (compat).
 fn home_env_override() -> Option<PathBuf> {
-    std::env::var_os("KIRO_HOME")
+    std::env::var_os("FC_HOME")
+        .or_else(|| std::env::var_os("KIRO_HOME"))
         .or_else(|| std::env::var_os("GROK_HOME"))
         .map(PathBuf::from)
 }
@@ -38,14 +43,14 @@ fn home_join(dirname: &str) -> PathBuf {
     dunce::canonicalize(&home).unwrap_or(home).join(dirname)
 }
 
-/// The default user config directory (`~/.kiro`, canonicalized) used when
-/// neither `KIRO_HOME` nor `GROK_HOME` is set.
+/// The default user config directory (`~/.fc`, canonicalized) used when
+/// no `FC_HOME` / prior-override env is set.
 ///
 /// Uses [`dunce::canonicalize`] instead of [`std::fs::canonicalize`]: on
 /// Windows, std returns a verbatim path (`\\?\C:\Users\...`) which external
 /// tools choke on — e.g. `git clone` rejects `\\?\` destinations with
 /// "Invalid argument", breaking marketplace cache clones under
-/// `~/.kiro/marketplace-cache`. `dunce` strips the prefix whenever the path
+/// `~/.fc/marketplace-cache`. `dunce` strips the prefix whenever the path
 /// is safely representable in legacy form; on non-Windows it is identical to
 /// `std::fs::canonicalize`.
 ///
@@ -60,36 +65,29 @@ pub fn legacy_grok_home() -> PathBuf {
     home_join(LEGACY_HOME_DIRNAME)
 }
 
-/// Copy login/config files from official `~/.grok` into `new_home` when the
-/// destination is missing them. Does not open or keep using `~/.grok` after
-/// seeding, so process open-file scans no longer point at a `grok` path.
-fn seed_from_legacy_home(new_home: &Path) {
-    // Explicit override: user chose the path; do not touch legacy.
-    if std::env::var_os("KIRO_HOME").is_some() || std::env::var_os("GROK_HOME").is_some() {
-        return;
-    }
-    let legacy = legacy_grok_home();
-    if !legacy.is_dir() {
-        return;
-    }
-    // Same directory (e.g. user renamed) — nothing to do.
-    if legacy == new_home {
-        return;
-    }
+/// Previous fork `~/.kiro` path (for one-time credential seeding only).
+pub fn prior_fork_home() -> PathBuf {
+    home_join(PRIOR_FORK_HOME_DIRNAME)
+}
 
-    // Auth + settings that make login work without re-OAuth. Sessions are
-    // intentionally not bulk-copied (large); they reappear as new work.
-    const SEED_FILES: &[&str] = &[
-        "auth.json",
-        "config.toml",
-        "agent_id",
-        "campaigns_state.json",
-        "mcp_credentials.json",
-        "requirements.toml",
-        ".metadata_version",
-    ];
+/// Auth + settings that make login work without re-OAuth. Sessions are
+/// intentionally not bulk-copied (large); they reappear as new work.
+const SEED_FILES: &[&str] = &[
+    "auth.json",
+    "config.toml",
+    "agent_id",
+    "campaigns_state.json",
+    "mcp_credentials.json",
+    "requirements.toml",
+    ".metadata_version",
+];
+
+fn seed_files_from(src_home: &Path, new_home: &Path) {
+    if !src_home.is_dir() || src_home == new_home {
+        return;
+    }
     for name in SEED_FILES {
-        let src = legacy.join(name);
+        let src = src_home.join(name);
         let dst = new_home.join(name);
         if src.is_file() && !dst.exists() {
             let _ = std::fs::copy(&src, &dst);
@@ -97,8 +95,21 @@ fn seed_from_legacy_home(new_home: &Path) {
     }
 }
 
-/// Per-user config directory: `$KIRO_HOME` / `$GROK_HOME` or `~/.kiro`.
-/// Created if needed. Seeds from `~/.grok` once when using the default path.
+/// Copy login/config files from prior homes (`~/.kiro`, then `~/.grok`) into
+/// `new_home` when the destination is missing them. Does not keep those
+/// paths open after seeding, so open-file scans no longer point at them.
+fn seed_from_legacy_home(new_home: &Path) {
+    // Explicit override: user chose the path; do not touch legacy.
+    if home_env_override().is_some() {
+        return;
+    }
+    // Prefer the previous fork home (already migrated login) over official.
+    seed_files_from(&prior_fork_home(), new_home);
+    seed_files_from(&legacy_grok_home(), new_home);
+}
+
+/// Per-user config directory: `$FC_HOME` (or prior overrides) or `~/.fc`.
+/// Created if needed. Seeds from prior homes once when using the default path.
 pub fn grok_home() -> PathBuf {
     GROK_HOME
         .get_or_init(|| {
@@ -111,25 +122,25 @@ pub fn grok_home() -> PathBuf {
 }
 
 /// The user-global home, but only when one genuinely resolves: `Some` when
-/// `$KIRO_HOME` / `$GROK_HOME` is set or a home directory is found, `None`
-/// otherwise. Unlike [`grok_home()`], this never falls back to a cwd-relative
-/// project tree, so callers that *scan* user-global resources (hooks,
-/// marketplace sources, ...) don't mistake a project's config tree for the
-/// user-global one when no home resolves.
+/// a home override is set or a home directory is found, `None` otherwise.
+/// Unlike [`grok_home()`], this never falls back to a cwd-relative project
+/// tree, so callers that *scan* user-global resources (hooks, marketplace
+/// sources, ...) don't mistake a project's config tree for the user-global
+/// one when no home resolves.
 pub fn user_grok_home() -> Option<PathBuf> {
     #[allow(deprecated)]
     let resolvable = home_env_override().is_some() || std::env::home_dir().is_some();
     resolvable.then(grok_home)
 }
 
-/// Canonical kiro application path: `$KIRO_HOME/bin/kiro` (Unix) or `kiro.exe` (Windows).
+/// Canonical application path: `$FC_HOME/bin/fc` (Unix) or `fc.exe` (Windows).
 pub fn grok_application() -> PathBuf {
     grok_application_in(&grok_home())
 }
 
 /// [`grok_application`] under an explicit home instead of the resolved home.
 pub fn grok_application_in(home: &std::path::Path) -> PathBuf {
-    let name = if cfg!(windows) { "kiro.exe" } else { "kiro" };
+    let name = if cfg!(windows) { "fc.exe" } else { "fc" };
     home.join("bin").join(name)
 }
 

@@ -397,17 +397,22 @@ async fn mint_provider_token(
         // additionally kills the whole process group on timeout.
         .kill_on_drop(true);
     if mark_expired {
-        cmd.env("GROK_AUTH_EXPIRED", "1");
+        // Fork: FC_* only (strip legacy product names from child environ).
+        cmd.env_remove("GROK_AUTH_EXPIRED");
+        cmd.env("FC_AUTH_EXPIRED", "1");
     }
     // Git-credential-helper handback: give the command the last stored
     // credential so it can refresh instead of re-authenticating.
     if let Some(prev) = previous {
-        cmd.env("GROK_AUTH_PROVIDER_ACCESS_TOKEN", &prev.token);
+        cmd.env_remove("GROK_AUTH_PROVIDER_ACCESS_TOKEN");
+        cmd.env_remove("GROK_AUTH_PROVIDER_REFRESH_TOKEN");
+        cmd.env_remove("GROK_AUTH_PROVIDER_EXPIRES_AT");
+        cmd.env("FC_AUTH_PROVIDER_ACCESS_TOKEN", &prev.token);
         if let Some(refresh) = &prev.refresh_token {
-            cmd.env("GROK_AUTH_PROVIDER_REFRESH_TOKEN", refresh);
+            cmd.env("FC_AUTH_PROVIDER_REFRESH_TOKEN", refresh);
         }
         if let Some(expires_at) = prev.expires_at {
-            cmd.env("GROK_AUTH_PROVIDER_EXPIRES_AT", expires_at.to_rfc3339());
+            cmd.env("FC_AUTH_PROVIDER_EXPIRES_AT", expires_at.to_rfc3339());
         }
     }
     xai_grok_tools::util::detach_command(&mut cmd);

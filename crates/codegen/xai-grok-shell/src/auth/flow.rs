@@ -203,8 +203,8 @@ pub struct AuthChannels {
     pub code_rx: mpsc::Receiver<String>,
 }
 
-/// Sets no `GROK_AUTH_EXPIRED`: operator binaries, which live outside this
-/// repo, read that variable as "headless, don't prompt" and decline the run.
+/// Sets no `FC_AUTH_EXPIRED` / `GROK_AUTH_EXPIRED`: operator binaries outside
+/// this repo treat that flag as "headless, don't prompt" and decline the run.
 async fn run_external_auth_provider(
     command: &str,
     auth_manager: &Arc<AuthManager>,
@@ -239,6 +239,8 @@ async fn run_external_auth_provider(
         cmd.stderr(std::process::Stdio::piped());
     }
 
+    // Interactive login: do not set FC_AUTH_EXPIRED / GROK_AUTH_EXPIRED.
+    // External providers treat that flag as "headless, don't prompt".
     xai_grok_tools::util::detach_command(&mut cmd);
     cmd.envs(xai_grok_tools::util::pager_env());
 

@@ -181,10 +181,11 @@ enabled = true
 items = [\"action-required\", \"spinner\", \"activity\", \"session-name\", \"grok\"]
 
 # [[ui.notifications.hooks]]
-# command = \"terminal-notifier -title 'Grok' -message '$GROK_MESSAGE'\"
+# command = \"terminal-notifier -title 'fc' -message '$FC_MESSAGE'\"
 # events = [\"turn_complete\", \"approval_required\"]
 # only_unfocused = true
 # timeout_secs = 10
+# Env on the hook child: FC_EVENT, FC_MESSAGE, FC_SESSION_ID (no GROK_* exports)
 "
         .to_owned()
     }

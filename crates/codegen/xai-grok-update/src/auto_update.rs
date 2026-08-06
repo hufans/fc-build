@@ -40,7 +40,7 @@ fn reinstall_hint(installer: &str) -> String {
     match installer {
         "npm" => "Please reinstall via npm:\n  npm i -g @xai-official/grok".to_string(),
         "gh-release" => "Please reinstall via GitHub Releases:\n  gh release download --repo xai-org-shared/grok-build --pattern 'grok-*' --output grok && chmod +x grok".to_string(),
-        "kiro" => format!(
+        "fc" => format!(
             "Please reinstall via:\n  curl -fsSL https://raw.githubusercontent.com/{}/main/scripts/install.sh | bash",
             crate::kiro_installer::DEFAULT_REPO
         ),
@@ -338,9 +338,9 @@ pub async fn ensure_latest_on_disk(update_config: &UpdateConfig) -> Result<Ensur
 fn disk_version_for_installer(installer: &str) -> Option<String> {
     match installer {
         "internal" | "gh-release" => crate::version::installed_on_disk_version(),
-        // kiro installs live at current_exe / ~/.local/bin/kiro; no versioned
+        // fc installs live at current_exe / ~/.local/bin/fc; no versioned
         // symlink layout — leave to the running binary version.
-        "kiro" => None,
+        "fc" => None,
         _ => None,
     }
 }
@@ -351,7 +351,7 @@ fn env_installer() -> Option<&'static str> {
             "npm" => Some("npm"),
             "internal" => Some("internal"),
             "gh-release" | "gh" => Some("gh-release"),
-            "kiro" => Some("kiro"),
+            "fc" => Some("fc"),
             _ => None,
         };
     }
@@ -371,16 +371,16 @@ pub async fn get_installer() -> Option<&'static str> {
     if let Some(i) = env_installer() {
         return Some(i);
     }
-    // Fork binary named `kiro` always uses the kiro continuous channel — never
+    // Fork binary named `fc` always uses the fc continuous channel — never
     // the official x.ai CDN (which would overwrite with `grok`).
     if crate::kiro_installer::running_as_kiro() {
-        return Some("kiro");
+        return Some("fc");
     }
     let cfg = config::load_config().await;
     match cfg.cli.installer.as_deref() {
         Some("npm") => Some("npm"),
         Some("gh-release") => Some("gh-release"),
-        Some("kiro") => Some("kiro"),
+        Some("fc") => Some("fc"),
         _ => Some("internal"),
     }
 }
@@ -424,9 +424,9 @@ fn needs_update(current: &str, target: &str, channel: &str, allow_downgrade: boo
 /// `get_installer()`, so they also get rollback support.
 fn installer_allows_downgrade(installer: &str) -> bool {
     match installer {
-        // kiro continuous may keep the same package semver with a new commit
+        // fc continuous may keep the same package semver with a new commit
         // (encoded as build metadata); treat inequality as an update.
-        "internal" | "gh-release" | "kiro" => true,
+        "internal" | "gh-release" | "fc" => true,
         "npm" => false,
         _ => false,
     }
@@ -788,7 +788,7 @@ pub async fn run_install_script(
             update_config.npm_registry.as_deref(),
         ),
         "gh-release" => install_gh_release(target).await,
-        "kiro" => crate::kiro_installer::install(target).await,
+        "fc" => crate::kiro_installer::install(target).await,
         _ => install_internal(target, update_config).await,
     };
     if result.is_ok() {
@@ -2398,22 +2398,22 @@ pub async fn run_update(
 
     heal_managed_install(installer).await;
 
-    let current_version = if installer == "kiro" {
+    let current_version = if installer == "fc" {
         crate::kiro_installer::running_version()
             .await
             .unwrap_or_else(|_| get_installed_grok_version())
     } else {
         get_installed_grok_version()
     };
-    let product = if installer == "kiro" { "kiro" } else { "Grok" };
+    let product = if installer == "fc" { "fc" } else { "Grok" };
     let policy = config::VersionPolicy::resolve();
 
     // When --version is given, skip the latest-version check and install directly
     if let Some(version) = pinned_version {
-        if installer == "kiro" {
+        if installer == "fc" {
             anyhow::bail!(
-                "kiro update uses the continuous release channel; \
-                 --version is not supported. Run `kiro update` without --version."
+                "fc update uses the continuous release channel; \
+                 --version is not supported. Run `fc update` without --version."
             );
         }
         if let Err(e) = crate::version_policy::check_install_target(&policy, version) {
@@ -2555,7 +2555,7 @@ pub async fn run_update(
     };
 
     eprintln!();
-    // kiro continuous ignores the version pin; still pass for API uniformity.
+    // fc continuous ignores the version pin; still pass for API uniformity.
     run_install_script(installer, Some(target_version), update_config).await?;
     // Fetch the stable pointer now so the new binary has it immediately
     // for channel_label() display, rather than waiting for the next

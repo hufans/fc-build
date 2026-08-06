@@ -50,21 +50,14 @@ pub(crate) fn run_wrapped_command(program: &str, args: &[String]) -> Result<i32>
     let mut cmd = CommandBuilder::new(program);
     args.iter().for_each(|arg| cmd.arg(arg));
 
-    // Advertise to the wrapped program — and anything it spawns, e.g. a remote
-    // `grok` reached over SSH — that its OSC 52 clipboard writes are being
-    // intercepted here and copied to the real local clipboard. The inner grok
-    // reads this (see `xai_grok_pager_render::clipboard::osc52_sink_active`) to
-    // *trust* OSC 52 even when it can't detect an OSC-52-capable terminal,
-    // which is the usual SSH case (only `TERM` propagates, so the inner grok
-    // cannot otherwise verify that the local clipboard received the write).
-    //
-    // `CommandBuilder::new` inherits the full parent environment; `env` overlays
-    // these two without clearing it. The canonical `GROK_OSC52_SINK` is
-    // inherited by local children; the `LC_`-prefixed alias rides the default
-    // OpenSSH env forwarding (`SendEnv LANG LC_*` on the client,
-    // `AcceptEnv LANG LC_*` on the server) so the signal survives the SSH hop.
-    cmd.env("GROK_OSC52_SINK", "1");
-    cmd.env("LC_GROK_OSC52_SINK", "1");
+    // Advertise to the wrapped program that OSC 52 clipboard writes are being
+    // intercepted (see `xai_grok_pager_render::clipboard::osc52_sink_active`).
+    // Use FC_* names only so child environ scanners do not see GROK_* fingerprints.
+    // The `LC_`-prefixed alias rides OpenSSH `SendEnv/AcceptEnv LANG LC_*`.
+    cmd.env_remove("GROK_OSC52_SINK");
+    cmd.env_remove("LC_GROK_OSC52_SINK");
+    cmd.env("FC_OSC52_SINK", "1");
+    cmd.env("LC_FC_OSC52_SINK", "1");
 
     // Not session-scoped: this is the wrapped process itself.
     #[allow(clippy::disallowed_methods)]

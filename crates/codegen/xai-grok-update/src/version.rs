@@ -346,7 +346,7 @@ pub async fn fetch_latest_version(installer: &str, config: &UpdateConfig) -> Res
     match installer {
         "npm" => fetch_npm_version(&config.channel, config.npm_registry.as_deref()).await,
         "gh-release" => fetch_gh_release_version(&config.channel).await,
-        "kiro" => crate::kiro_installer::fetch_latest_version().await,
+        "fc" => crate::kiro_installer::fetch_latest_version().await,
         _ => fetch_gcs_version(&config.channel).await,
     }
 }

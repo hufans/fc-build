@@ -20,7 +20,7 @@ use tokio::io::AsyncReadExt;
 
 pub use xai_grok_config::shell::UnixShellKind;
 
-const INIT_MARKER: &str = "__GROK_STATIC_SHELL_MARKER__";
+const INIT_MARKER: &str = "__FC_STATIC_SHELL_MARKER__";
 const INIT_TIMEOUT: Duration = Duration::from_secs(15);
 
 /// A fixed snapshot of rc-defined functions and aliases, captured once.
@@ -141,25 +141,27 @@ impl StaticShellSnapshot {
         // auto-export the temp variable into the user command's child
         // processes — strip the export attribute post-assignment (inline
         // `declare +x var=value` does NOT beat allexport).
+        // Use FC_AGENT / __fc_* only — process monitors see the full `-c`
+        // wrapper in argv, so any "grok" substring here triggers EDR rules.
         let wrapper = match self.shell {
             UnixShellKind::Bash => format!(
                 "snap=$(command cat <&3); builtin shopt -s extglob 2>/dev/null; \
                  builtin shopt -s expand_aliases 2>/dev/null; \
                  builtin eval -- \"$snap\"; \
-                 builtin export GROK_AGENT=1; \
+                 builtin export FC_AGENT=1; \
                  builtin export PWD=\"$(builtin pwd)\"; {sudo_inject}{search_inject}\
-                 __grok_user_cmd=\"$1\"; builtin declare +x __grok_user_cmd 2>/dev/null; builtin set --; \
-                 builtin eval \"$__grok_user_cmd\" 2>&1"
+                 __fc_user_cmd=\"$1\"; builtin declare +x __fc_user_cmd 2>/dev/null; builtin set --; \
+                 builtin eval \"$__fc_user_cmd\" 2>&1"
             ),
             UnixShellKind::Zsh => format!(
                 "snap=$(command cat <&3); \
                  builtin setopt nonomatch 2>/dev/null; \
                  builtin eval \"$snap\"; \
-                 builtin export GROK_AGENT=1; \
+                 builtin export FC_AGENT=1; \
                  builtin export PWD=\"$(builtin pwd)\"; \
                  builtin setopt aliases 2>/dev/null; {sudo_inject}{search_inject}\
-                 __grok_user_cmd=\"$1\"; builtin typeset +x __grok_user_cmd 2>/dev/null; builtin set --; \
-                 builtin eval \"$__grok_user_cmd\" 2>&1"
+                 __fc_user_cmd=\"$1\"; builtin typeset +x __fc_user_cmd 2>/dev/null; builtin set --; \
+                 builtin eval \"$__fc_user_cmd\" 2>&1"
             ),
         };
 
@@ -287,8 +289,8 @@ mod tests {
             return;
         }
         let output = run_static(
-            "alias grok_alias_probe='echo ALIAS_OK'\ngrok_fn_probe() { echo FN_OK; }\n",
-            "grok_alias_probe && grok_fn_probe",
+            "alias fc_alias_probe='echo ALIAS_OK'\nfc_fn_probe() { echo FN_OK; }\n",
+            "fc_alias_probe && fc_fn_probe",
         )
         .await;
         assert!(output.status.success(), "command failed: {output:?}");

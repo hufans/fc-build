@@ -386,19 +386,22 @@ pub fn now_epoch_secs() -> i64 {
 }
 
 pub fn resolve_grok_home() -> Result<PathBuf> {
-    // Prefer KIRO_HOME (fork) then GROK_HOME (upstream compat). Keep in sync
-    // with xai_grok_config::paths (default dir is `.kiro`, not `.grok`).
-    if let Ok(v) = std::env::var("KIRO_HOME").or_else(|_| std::env::var("GROK_HOME")) {
+    // Prefer FC_HOME (fork) then prior / official overrides. Keep in sync
+    // with xai_grok_config::paths (default dir is `.fc`).
+    if let Ok(v) = std::env::var("FC_HOME")
+        .or_else(|_| std::env::var("KIRO_HOME"))
+        .or_else(|_| std::env::var("GROK_HOME"))
+    {
         return Ok(PathBuf::from(v));
     }
     let home = PathBuf::from(
-        std::env::var("HOME").context("neither $KIRO_HOME / $GROK_HOME nor $HOME is set")?,
+        std::env::var("HOME").context("neither $FC_HOME nor $HOME is set")?,
     );
     // Canonicalize the home dir so worktree paths share the same physical
     // config tree as trust/hooks even when it is symlinked. The dunce
     // canonicalization must stay in sync with xai_grok_config::default_grok_home();
     // home resolution deliberately differs ($HOME here vs std::env::home_dir()).
-    Ok(dunce::canonicalize(&home).unwrap_or(home).join(".kiro"))
+    Ok(dunce::canonicalize(&home).unwrap_or(home).join(".fc"))
 }
 
 /// Serializes tests that mutate the process-global `GROK_HOME` env var so they

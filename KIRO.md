@@ -31,12 +31,12 @@
 |----|------|
 | 上游 | [xai-org/grok-build](https://github.com/xai-org/grok-build)（SpaceXAI Grok Build） |
 | 本仓库 | [hufans/kiro-build](https://github.com/hufans/kiro-build)（原 fork 名 `grok-build`，已改名） |
-| 本地 CLI | **`kiro`**（二进制名、`Usage`、`--version` 前缀） |
+| 本地 CLI | **`fc`**（二进制名、`Usage`、`--version` 前缀） |
 | 官方 CLI | `grok` |
 | 认证 / API | **不变**，仍走官方 Grok / xAI |
-| 配置目录 | **`~/.kiro`** / `$KIRO_HOME`（首次可从 `~/.grok` 迁移登录态） |
+| 配置目录 | **`~/.fc`** / `$FC_HOME`（首次可从 `~/.grok` 迁移登录态） |
 
-**一句话：** 官方能力 + 本地命令叫 `kiro`；配置目录与进程环境去 `grok` 指纹；API/登录协议不变；用 CI + `continuous` Release 做简易分发。
+**一句话：** 官方能力 + 本地命令叫 `fc`；配置目录与进程环境去 `grok` 指纹；API/登录协议不变；用 CI + `continuous` Release 做简易分发。
 
 ---
 
@@ -47,15 +47,15 @@
 | 提交 | 说明 |
 |------|------|
 | *(next)* | Actions **Sync upstream**：定时 merge 官方并开 PR / 自动合入 |
-| *(next)* | `kiro update` 自更新：`kiro_installer` + `installer = "kiro"` |
+| *(next)* | `fc update` 自更新：`kiro_installer` + `installer = "fc"` |
 | *(ops)* | 手动用已编好的 arm64/linux 创建 **`continuous`** Release，解除 install 404 |
 | `2176d66` | 新增 `scripts/install.sh`；CI 在 main 构建成功后发布 **`continuous`** Release |
-| `512f216` | README 改为 **Kiro** 标题与本 fork 安装/CI 说明 |
+| `512f216` | README 改为 **fc** 标题与本 fork 安装/CI 说明 |
 | `e4cbe04` | 文档中的仓库链接改为 `hufans/kiro-build`（GitHub 仓库已改名） |
-| `63ff69d` | 首次加入 GitHub Actions `Build kiro`（三平台 release 编译 + Artifacts） |
-| *(next)* | Sync upstream：无冲突直推 main + dispatch Build kiro（不再依赖开 PR） |
-| `7f33568` | 去指纹：`~/.kiro` + 从 `~/.grok` 迁移登录；`KIRO_AGENT`；安装避开 `~/.grok/bin` |
-| `0eefcc7` | 核心 rebrand：二进制 / CLI 展示名为 `kiro`；测试路径与进程识别兼容 kiro |
+| `63ff69d` | 首次加入 GitHub Actions `Build fc`（三平台 release 编译 + Artifacts） |
+| *(next)* | Sync upstream：无冲突直推 main + dispatch Build fc（不再依赖开 PR） |
+| `7f33568` | 去指纹：`~/.fc` + 从 `~/.grok` 迁移登录；`KIRO_AGENT`；安装避开 `~/.grok/bin` |
+| `0eefcc7` | 核心 rebrand：二进制 / CLI 展示名为 `fc`；测试路径与进程识别兼容 kiro |
 
 **仓库改名（GitHub 侧，无独立 commit）：**
 
@@ -95,7 +95,7 @@ git remote -v
 git add -A
 git commit -m "说明"
 git push origin main
-# 会触发 Build kiro；成功后刷新 continuous Release
+# 会触发 Build fc；成功后刷新 continuous Release
 ```
 
 ### 3.3 推送 Workflow 注意
@@ -116,17 +116,17 @@ refusing to allow an OAuth App to create or update workflow ... without workflow
 
 | 文件 | 改了什么 |
 |------|----------|
-| `crates/codegen/xai-grok-pager-bin/Cargo.toml` | `[[bin]] name = "kiro"`，`default-run = "kiro"` |
-| `crates/codegen/xai-grok-pager-bin/src/main.rs` | `version_text` → `kiro …`；相关测试 |
-| `crates/codegen/xai-grok-pager/src/app/cli.rs` | clap `name`/`about`；示例文案；`parse_cli` 认 kiro/grok/agent |
-| `crates/codegen/xai-grok-pager/src/completions_cmd.rs` | 补全按 `kiro` 生成 |
-| `crates/codegen/xai-grok-pager/tests/doctor_early_dispatch.rs` | `CARGO_BIN_EXE_kiro` |
-| `crates/codegen/xai-grok-test-support/src/env.rs` | 本地二进制路径 / `cargo build --bin kiro` |
+| `crates/codegen/xai-grok-pager-bin/Cargo.toml` | `[[bin]] name = "fc"`，`default-run = "fc"` |
+| `crates/codegen/xai-grok-pager-bin/src/main.rs` | `version_text` → `fc …`；相关测试 |
+| `crates/codegen/xai-grok-pager/src/app/cli.rs` | clap `name`/`about`；示例文案；`parse_cli` 认 fc/kiro/grok/agent |
+| `crates/codegen/xai-grok-pager/src/completions_cmd.rs` | 补全按 `fc` 生成 |
+| `crates/codegen/xai-grok-pager/tests/doctor_early_dispatch.rs` | `CARGO_BIN_EXE_fc` |
+| `crates/codegen/xai-grok-test-support/src/env.rs` | 本地二进制路径 / `cargo build --bin fc` |
 | `crates/codegen/xai-grok-pager-pty-harness/src/env.rs` | 同上 |
 | `crates/codegen/xai-grok-pager-pty-harness/src/bin/*.rs` | 注释中的 bin 名 |
-| `crates/codegen/xai-grok-shell-base/src/util/mod.rs` | `is_grok_process*` 同时认 **kiro** 与 **grok** |
-| `crates/codegen/xai-grok-update/src/kiro_installer.rs` | **新增**：`kiro update` 从 continuous Release 自更新 |
-| `crates/codegen/xai-grok-update/src/auto_update.rs` 等 | 注册 `installer = "kiro"`，避免走 x.ai CDN |
+| `crates/codegen/xai-grok-shell-base/src/util/mod.rs` | `is_grok_process*` 认 **fc**（兼容旧 kiro/grok） |
+| `crates/codegen/xai-grok-update/src/kiro_installer.rs` | **新增**：`fc update` 从 continuous Release 自更新 |
+| `crates/codegen/xai-grok-update/src/auto_update.rs` 等 | 注册 `installer = "fc"`，避免走 x.ai CDN |
 
 ### 4.2 本 fork 独有（upstream 无对应，merge 时整文件保留）
 
@@ -134,44 +134,61 @@ refusing to allow an OAuth App to create or update workflow ... without workflow
 |------|------|
 | `KIRO.md` | **本维护手册** |
 | `scripts/install.sh` | 一键安装 |
-| `.github/workflows/build-kiro.yml` | 编译 + 发布 continuous |
+| `.github/workflows/build-fc.yml` | 编译 + 发布 continuous |
 | `README.md` | 已按 Kiro 重写（与 upstream README 会冲突，merge 后以本版为准或手工合并） |
 
 ### 4.3 进程/路径去指纹（公司扫描友好）
 
-目标：**继续用官方 Grok 登录与 API**，但进程名、安装路径、配置目录、子进程环境里尽量不出现 `grok` 字样（Cursor/OpenCode 里用 Grok 模型通常仍允许；公司若扫的是「grok CLI」路径/进程指纹，本 fork 针对性弱化）。
+目标：**继续用官方 Grok 登录与 API**，但进程名、安装路径、配置目录、子进程 **argv/env** 里不出现 `grok` / `kiro` 产品指纹。产品对外名：**`fc`**。
 
 | 项 | 行为 |
 |----|------|
-| 默认配置目录 | **`~/.kiro`**（`$KIRO_HOME` 优先，其次兼容 `$GROK_HOME`） |
-| 登录迁移 | 首次启动若 `~/.kiro` 缺 `auth.json`/`config.toml` 等，从官方 **`~/.grok` 复制一次**（之后不再依赖 `~/.grok` 路径） |
-| 二进制落点 | **`~/.local/bin/kiro`**（不要装到 `~/.grok/bin`） |
-| 子进程哨兵 | **`KIRO_AGENT=1`**（不再导出 `GROK_AGENT=1`） |
-| 认证 / API | **不变**（仍官方 OAuth / x.ai） |
+| 默认配置目录 | **`~/.fc`**（`$FC_HOME` 优先；兼容 `$KIRO_HOME` / `$GROK_HOME` 仅作路径覆盖） |
+| 登录迁移 | 首次启动从 **`~/.kiro`** 再 **`~/.grok`** 各 seed 一次缺的登录文件 |
+| 二进制落点 | **`~/.local/bin/fc`**（不要装到 `~/.grok/bin`） |
+| 子进程哨兵 | **`FC_AGENT=1`**（并 `env_remove` 掉继承的 `GROK_AGENT` / `KIRO_AGENT`） |
+| Shell 包装 argv | **`__fc_user_cmd` / `__fc_bin` / `__fc_shadow_*`** |
+| 状态 dump 标记 | **`__FC_*_STATE_*` / `fc_snap_`** |
+| Hook / 通知子进程 env | **`FC_HOOK_*` / `FC_EVENT` / `FC_SESSION_ID`…**（剥离 `GROK_*` 同名） |
+| OSC52 wrap 标记 | **`FC_OSC52_SINK` / `LC_FC_OSC52_SINK`**（读侧仍兼容旧 `GROK_*`） |
+| 外部 auth provider env | **`FC_AUTH_*`**（不再 export `GROK_AUTH_*`） |
+| 项目发现目录 | **优先 `.fc/`**（agents/skills/workflows/sandbox）；仍扫描 legacy `.grok/` |
+| 认证 / API | **不变**（仍官方 OAuth / x.ai；HTTP 仍有 `x-grok-*` 协议头） |
+
+> **公司 EDR 告警对照（2026-08）：** 进程创建监控扫的是 `zsh -c '…'` **整段 argv**。  
+> 旧 `grok`/`kiro` 二进制会把 `export GROK_AGENT=1`、`__grok_bin` / `__kiro_*` 等写进命令行。  
+> 相关代码：`static_shell.rs`、`embedded_search_tools.rs`、`shell_state.rs`、`paths.rs`。  
+> 改完后必须 **全量重编并替换安装路径上的 `fc`**，旧进程/旧 binary 仍会告警。
 
 **你本机必须做的清理（代码改完后）：**
 
-1. 重新编译并安装到 `~/.local/bin/kiro`（见 §5）
-2. 从 shell 配置里 **删掉** `PATH` 中的 `~/.grok/bin`
-3. 确认 `which kiro` 不是 `~/.grok/bin/kiro`
-4. 关掉旧会话后用新二进制启动；确认 `lsof -p $(pgrep -n kiro)` 打开的是 `~/.kiro/...` 而不是 `~/.grok/...`
-5. 确认登录正常后，可归档/重命名 `~/.grok`（例如 `mv ~/.grok ~/.grok.bak`），避免家目录扫描命中
+1. 重新编译并安装到 `~/.local/bin/fc`（见 §5）
+2. 从 shell 配置里 **删掉** `PATH` 中的 `~/.grok/bin` / 旧 `fc`
+3. 确认 `which fc` → `~/.local/bin/fc`（不是 `~/.grok/...`）
+4. 关掉所有旧 `fc`/`grok` 会话后用新二进制启动
+5. 确认打开文件是 `~/.fc/...`：`lsof -p $(pgrep -n fc) | head`
+6. 自检（应 **无** 输出）：  
+   ```bash
+   strings "$(which fc)" | grep -E '__grok_|__kiro_|GROK_AGENT=1|KIRO_AGENT=1|__GROK_.*STATE|__KIRO_.*STATE|grok_snap_|kiro_snap_'
+   ```
 
 **仍无法完全抹掉的（诚实边界）：**
 
-- 二进制内部仍有大量 `grok` 字符串（crate 名、文案、模型 id）；深扫 `strings` 仍可能认出
-- 网络仍访问 x.ai / 官方鉴权（与 Cursor 用 Grok 模型同类）
-- 仓库/工程里若路径含 `Grok`（如 `~/Code/Grok/...`）会出现在进程 cwd
+- 二进制内部仍有大量 `grok` 字符串（crate 名 `xai-grok-*`、文案、模型 id、CLI 帮助里的 `GROK_*` 配置项）；深扫 `strings` 仍可能认出
+- 网络仍访问 x.ai / 官方鉴权
+- 仓库/工程路径若含 `Grok` 会出现在进程 cwd
 - 项目级 `.grok/` 目录（skills/hooks）尚未全局改名
+- 兼容层仍 **识别** 旧进程名 `fc`/`grok`（仅用于不误杀/接受旧 argv0），**不会**再导出这些名字
 
 ### 4.4 明确未改
 
 - Crate 包名仍为 `xai-grok-*`
 - 官方 OAuth 与 API 协议
 - 业务逻辑、工具实现
-- 官方 `https://x.ai/cli/install.sh`（装的是 `grok`，不是 kiro）
+- 官方 `https://x.ai/cli/install.sh`（装的是 `grok`，不是 fc）
+- GitHub 仓库 slug 仍可能是 `hufans/kiro-build`（与本地产品名无关）
 
-**merge 原则：** 品牌相关冲突 → 保留 kiro 命名；逻辑冲突 → 取 upstream 逻辑后再套 kiro 名。
+**merge 原则：** 品牌相关冲突 → 保留 **fc** 命名；逻辑冲突 → 取 upstream 逻辑后再套 fc 名。
 
 ---
 
@@ -195,17 +212,17 @@ refusing to allow an OAuth App to create or update workflow ... without workflow
 source "$HOME/.cargo/env"
 export PROTOC="${PROTOC:-$HOME/.local/protoc-29.3/bin/protoc}"
 
-cargo build -p xai-grok-pager-bin --release --bin kiro
-# → target/release/kiro
+cargo build -p xai-grok-pager-bin --release --bin fc
+# → target/release/fc
 
-install -m 755 target/release/kiro ~/.local/bin/kiro
+install -m 755 target/release/fc ~/.local/bin/fc
 # 不要装到 ~/.grok/bin（路径含 grok，易被扫描）
 ```
 
 ### 5.3 首次运行
 
 - 浏览器登录 = 官方 Grok 流程（协议不变）
-- 数据在 **`~/.kiro`**；若本机已有官方 `~/.grok` 登录态，会自动复制 `auth.json` / `config.toml` 等，一般无需重登
+- 数据在 **`~/.fc`**；若本机已有官方 `~/.grok` 登录态，会自动复制 `auth.json` / `config.toml` 等，一般无需重登
 
 ---
 
@@ -218,30 +235,30 @@ install -m 755 target/release/kiro ~/.local/bin/kiro
 curl -fsSL https://raw.githubusercontent.com/hufans/kiro-build/main/scripts/install.sh | bash
 
 # 之后更新（推荐）
-kiro update
-kiro update --check
+fc update
+fc update --check
 ```
 
-`kiro update` 由本 fork 的 **`kiro` installer** 实现（见 `crates/codegen/xai-grok-update/src/kiro_installer.rs`）：
+`fc update` 由本 fork 的 **`fc` installer** 实现（见 `crates/codegen/xai-grok-update/src/kiro_installer.rs`）：
 
-- 进程名为 `kiro`，或 `~/.grok/config.toml` 中 `installer = "kiro"`
-- 从 `continuous` Release 下载对应平台资产并替换 `current_exe` / `~/.local/bin/kiro` 等
+- 进程名为 `fc`，或 `~/.grok/config.toml` 中 `installer = "fc"`
+- 从 `continuous` Release 下载对应平台资产并替换 `current_exe` / `~/.local/bin/fc` 等
 - **不会**走官方 `https://x.ai/cli`（避免被覆盖成 `grok`）
 
 | 环境变量 | 默认 | 含义 |
 |----------|------|------|
-| `KIRO_REPO` | `hufans/kiro-build` | install.sh 用的仓库 |
-| `KIRO_TAG` / `KIRO_VERSION` | `continuous` | install.sh Release 标签 |
-| `KIRO_BIN_DIR` | `~/.local/bin` | install.sh 安装目录 |
-| `KIRO_RELEASE_REPO` | `hufans/kiro-build` | `kiro update` 用的仓库 |
-| `KIRO_RELEASE_TAG` | `continuous` | `kiro update` 用的标签 |
+| `FC_REPO` | `hufans/kiro-build` | install.sh 用的仓库 |
+| `FC_TAG` / `FC_VERSION` | `continuous` | install.sh Release 标签 |
+| `FC_BIN_DIR` | `~/.local/bin` | install.sh 安装目录 |
+| `FC_RELEASE_REPO` | `hufans/kiro-build` | `fc update` 用的仓库 |
+| `FC_RELEASE_TAG` | `continuous` | `fc update` 用的标签 |
 
 脚本逻辑摘要：
 
 1. `uname` → `darwin-arm64` / `darwin-x86_64` / `linux-x86_64`
 2. 下载  
-   `https://github.com/<repo>/releases/download/<tag>/kiro-<platform>`
-3. `chmod +x`、试跑 `--version`、写入 `$KIRO_BIN_DIR/kiro`
+   `https://github.com/<repo>/releases/download/<tag>/fc-<platform>`
+3. `chmod +x`、试跑 `--version`、写入 `$FC_BIN_DIR/fc`
 4. PATH 不包含安装目录时打印配置提示
 
 源码：[`scripts/install.sh`](./scripts/install.sh)
@@ -254,7 +271,7 @@ push main
   → 全部成功
   → softprops/action-gh-release
   → tag: continuous（make_latest）
-  → assets: kiro-linux-x86_64, kiro-darwin-arm64
+  → assets: fc-linux-x86_64, fc-darwin-arm64
 ```
 
 Release 页：https://github.com/hufans/kiro-build/releases/tag/continuous  
@@ -267,14 +284,14 @@ Release 页：https://github.com/hufans/kiro-build/releases/tag/continuous
 |--|-----------|--------------|
 | 脚本 | `https://x.ai/cli/install.sh` | `scripts/install.sh`（raw.githubusercontent） |
 | 二进制托管 | x.ai CDN + GCS | GitHub Release `continuous` |
-| 命名 | `grok-{ver}-{platform}` | `kiro-darwin-arm64` 等 |
+| 命名 | `grok-{ver}-{platform}` | `fc-darwin-arm64` 等 |
 | 频道 | stable/alpha 指针文件 | 固定 tag `continuous`（滚动覆盖） |
 
 ---
 
 ## 7. CI 工作流说明
 
-文件：[`.github/workflows/build-kiro.yml`](./.github/workflows/build-kiro.yml)  
+文件：[`.github/workflows/build-fc.yml`](./.github/workflows/build-fc.yml)  
 Actions：https://github.com/hufans/kiro-build/actions  
 
 ### 7.1 触发
@@ -324,7 +341,7 @@ cron / 手动
   → fetch xai-org/grok-build
   → 无新提交 → 结束
   → merge upstream/main → main
-      ├─ 无冲突 → push main → **同一 run 内 workflow_call「Build kiro」** → continuous
+      ├─ 无冲突 → push main → **同一 run 内 workflow_call「Build fc」** → continuous
       └─ 有冲突 → 开/更新 Issue（需你本地 resolve 后 push）
 ```
 
@@ -345,7 +362,7 @@ cron / 手动
 | 日期 | 现象 | 原因 | 修复 |
 |------|------|------|------|
 | 2026-07-30 | 开 PR 失败 | GITHUB_TOKEN 不能 createPullRequest | 改为直推 main |
-| 2026-07-31 | 已 push main，job 仍红 | `gh workflow run "Build kiro"` → `could not find any workflows named Build kiro`；且 bot push **不会**连锁触发 Build | 改为 `workflow_call` 在同一 pipeline 编包发 continuous |
+| 2026-07-31 | 已 push main，job 仍红 | `gh workflow run "Build fc"` → `could not find any workflows named Build fc`；且 bot push **不会**连锁触发 Build | 改为 `workflow_call` 在同一 pipeline 编包发 continuous |
 
 ### 8.2 手动同步
 
@@ -359,8 +376,8 @@ git push origin main
 ```
 
 ```sh
-cargo build -p xai-grok-pager-bin --release --bin kiro
-./target/release/kiro --version
+cargo build -p xai-grok-pager-bin --release --bin fc
+./target/release/fc --version
 ```
 
 ---
@@ -393,12 +410,12 @@ cargo build -p xai-grok-pager-bin --release --bin kiro
 # 一键装
 curl -fsSL https://raw.githubusercontent.com/hufans/kiro-build/main/scripts/install.sh | bash
 which kiro
-kiro --version          # 期望：kiro <ver> (<sha>)
+fc --version          # 期望：kiro <ver> (<sha>)
 kiro --help | head -5   # 期望：Kiro TUI / Usage: kiro
 
 # 本机构建
-cargo build -p xai-grok-pager-bin --release --bin kiro
-./target/release/kiro --version
+cargo build -p xai-grok-pager-bin --release --bin fc
+./target/release/fc --version
 
 # Release 是否齐全
 # 打开 https://github.com/hufans/kiro-build/releases/tag/continuous
@@ -425,7 +442,7 @@ cargo build -p xai-grok-pager-bin --release --bin kiro
 
 ## 12. 维护约定
 
-1. **品牌 diff 保持小**：只动 §4.1 列表；禁止全仓库 `grok`→`kiro`。  
+1. **品牌 diff 保持小**：只动 §4.1 列表；禁止全仓库 `grok`→`fc`。  
 2. **本手册与行为同步**：改 install/CI/命名时更新 §2 履历 + 对应章节。  
 3. **origin / upstream 职责清晰**：只向 origin 推 fork 维护；上游只 fetch/merge。  
 4. **发版以 CI 为准**：不要手搓 continuous 除非紧急；紧急时可 `gh release upload continuous --clobber`。  

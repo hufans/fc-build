@@ -221,8 +221,18 @@ pub fn kill_process_with_signal(pid: u32, signal: KillSignal) -> std::io::Result
 /// Best-effort on macOS/BSD (liveness-only via `kill -0`), exact on Linux (/proc cmdline) and Windows (image path).
 fn process_name_looks_like_grok_cli(name: &str) -> bool {
     let lower = name.to_ascii_lowercase();
-    // Local rebrand installs as `kiro`; official/upstream still use `grok`.
-    lower.contains("kiro") || lower.contains("grok")
+    // Match argv0 / path *components* only — do not use bare `contains("fc")`
+    // (too many false positives on short tokens).
+    lower
+        .split(|c: char| c == '/' || c == '\\' || c == '\0' || c.is_whitespace())
+        .any(|part| {
+            let stem = part
+                .rsplit_once('.')
+                .map(|(s, _)| s)
+                .unwrap_or(part);
+            // Current fork name, plus prior rebrands / official for orphan cleanup.
+            matches!(stem, "fc" | "kiro" | "grok" | "xai-grok-pager")
+        })
 }
 
 pub fn is_grok_process(pid: u32) -> bool {

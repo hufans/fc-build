@@ -53,7 +53,7 @@ struct Cli {
     #[arg(long, value_name = "DIR", default_value = "target/scroll-matrix")]
     artifacts: PathBuf,
 
-    /// Pager binary. Defaults to PAGER_BINARY, CARGO_BIN_EXE_kiro,
+    /// Pager binary. Defaults to PAGER_BINARY, CARGO_BIN_EXE_fc,
     /// or a locally-built debug binary.
     #[arg(long, value_name = "PATH")]
     binary: Option<PathBuf>,

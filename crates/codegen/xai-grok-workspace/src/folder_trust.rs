@@ -421,15 +421,17 @@ fn collect_repo_config_kinds(cwd: &Path, first_only: bool) -> Vec<&'static str> 
         hit!("agents");
     }
     // Presence matches exact-cwd discovery without parsing repository content.
-    let grok = cwd.join(".grok");
-    if directory_present_or_uncertain(&grok.join("roles")) {
-        hit!("roles");
-    }
-    if directory_present_or_uncertain(&grok.join("personas")) {
-        hit!("personas");
-    }
-    if directory_present_or_uncertain(&hook_root.join(".grok").join("workflows")) {
-        hit!("workflows");
+    for project_dot in [".fc", ".grok"] {
+        let base = cwd.join(project_dot);
+        if directory_present_or_uncertain(&base.join("roles")) {
+            hit!("roles");
+        }
+        if directory_present_or_uncertain(&base.join("personas")) {
+            hit!("personas");
+        }
+        if directory_present_or_uncertain(&hook_root.join(project_dot).join("workflows")) {
+            hit!("workflows");
+        }
     }
     // `~/.claude.json` `projects.<cwd>.mcpServers`.
     if claude_project_mcp_present(cwd) {

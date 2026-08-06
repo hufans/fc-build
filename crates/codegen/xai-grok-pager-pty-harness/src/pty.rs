@@ -529,7 +529,12 @@ fn cache_exit_status(
     *spawn_pid = None;
 }
 
-const CLIPBOARD_SINK_ENV_VARS: &[&str] = &["GROK_OSC52_SINK", "LC_GROK_OSC52_SINK"];
+const CLIPBOARD_SINK_ENV_VARS: &[&str] = &[
+    "FC_OSC52_SINK",
+    "LC_FC_OSC52_SINK",
+    "GROK_OSC52_SINK",
+    "LC_GROK_OSC52_SINK",
+];
 
 /// Host terminal identity markers stripped from the child environment.
 ///
