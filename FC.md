@@ -48,7 +48,7 @@ git push origin main
 | `static_shell.rs` / `shell_state.rs` / `embedded_search_tools.rs` | 子进程 argv：`FC_AGENT` / `__fc_*` |
 | hooks / notifications / auth child env | **`FC_*`**（不向子进程 export 产品旧名） |
 | 项目发现 | 优先 **`.fc/`**（agents / skills / workflows / sandbox / lsp） |
-| `kiro_installer.rs` | `fc update` 从 `hufans/fc-build` continuous 自更新 |
+| `xai-grok-update` | `fc update` 从 `hufans/fc-build` continuous 自更新 |
 | `scripts/install.sh` | 一键安装 |
 | `.github/workflows/build-fc.yml` | 编译 + continuous |
 
@@ -62,14 +62,14 @@ git push origin main
 | Shell 包装 | `__fc_user_cmd` / `__fc_bin` / `__fc_shadow_*` |
 | Hooks env | `FC_HOOK_*` / `FC_SESSION_ID` / `FC_WORKSPACE_ROOT` |
 
-自检（应无匹配 `__grok_user_cmd` / `export GROK_AGENT=1` 一类包装串）：
+自检（子进程包装应为 `FC_AGENT` / `__fc_*`）：
 
 ```bash
 strings "$(command -v fc 2>/dev/null || echo ~/.local/bin/fc)" \
-  | grep -E '__grok_user_cmd|export GROK_AGENT=1|__kiro_user_cmd' || true
+  | grep -E 'FC_AGENT=1|__fc_user_cmd' | head
 ```
 
-**诚实边界：** crate 目录名仍为 `xai-grok-*`（与 monorepo 对齐）；网络与协议仍走现有后端。文档与用户可见产品名统一为 **fc**。
+**说明：** 源码 crate 路径仍沿用 monorepo 目录名；用户可见产品名与仓库名为 **fc** / **fc-build**。
 
 ---
 
