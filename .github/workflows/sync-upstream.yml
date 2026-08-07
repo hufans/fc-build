@@ -1,4 +1,4 @@
-# Periodically merge optional upstream monorepo into this fork (daily).
+# Periodically merge optional upstream monorepo into this fork (every 6 hours).
 #
 # Happy path (no conflicts):
 #   1. merge upstream/main into origin/main
@@ -20,8 +20,8 @@ name: Sync upstream
 
 on:
   schedule:
-    # Once per day at 16:00 UTC (≈ 00:00 China time)
-    - cron: "0 16 * * *"
+    # Every 6 hours (00:00, 06:00, 12:00, 18:00 UTC)
+    - cron: "0 */6 * * *"
   workflow_dispatch:
     inputs:
       auto_merge:

@@ -119,12 +119,13 @@ push main → matrix 编译 → continuous Release
 
 ---
 
-## 6. 上游同步（可选）
+## 6. 上游同步
 
 工作流：[`.github/workflows/sync-upstream.yml`](./.github/workflows/sync-upstream.yml)
 
-- 定时 / 手动：合并上游 monorepo → 无冲突则 push main 并 `workflow_call` Build fc  
-- 有冲突 → Issue，本地 resolve 后 push  
+- **每 6 小时**（UTC `0 */6 * * *`）及手动 `workflow_dispatch`：检查 `xai-org/grok-build`
+- 有更新且无冲突 → merge → push `main` → `workflow_call` **Build fc** → 刷新 `continuous` Release  
+- 有冲突 → Issue（或仓库禁用 Issue 时看 Actions 日志），本地 resolve 后 push  
 
 ```sh
 git fetch upstream   # 若已配置
