@@ -142,13 +142,14 @@ jobs:
 
       - name: File issue when merge conflicts
         if: steps.status.outputs.already_up_to_date != 'true' && steps.merge.outputs.conflict == 'true'
+        continue-on-error: true
         env:
           GH_TOKEN: ${{ secrets.SYNC_PAT || secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
         run: |
           set -euo pipefail
           BEHIND="${{ steps.status.outputs.behind }}"
           TITLE="Upstream sync needs manual merge (${BEHIND} commits)"
-          EXISTING=$(gh issue list --state open --search "Upstream sync needs manual merge in:title" --json number --jq '.[0].number // empty')
           BODY="$(cat <<EOF
           Automated **Sync upstream** could not merge \`upstream/main\` cleanly.
 
@@ -170,13 +171,25 @@ jobs:
           See [FC.md](https://github.com/${{ github.repository }}/blob/main/FC.md).
           EOF
           )"
-          if [ -n "$EXISTING" ]; then
-            gh issue comment "$EXISTING" --body "$BODY"
-            echo "Commented on issue #$EXISTING"
+          echo "### ⚠️ Merge conflicts — manual resolve required" >> "$GITHUB_STEP_SUMMARY"
+          echo "$BODY" >> "$GITHUB_STEP_SUMMARY"
+          # Issues may be disabled on the fork; never fail the job solely for that.
+          if EXISTING=$(gh issue list --repo "$GH_REPO" --state open --search "Upstream sync needs manual merge in:title" --json number --jq '.[0].number // empty' 2>/dev/null); then
+            if [ -n "$EXISTING" ]; then
+              gh issue comment --repo "$GH_REPO" "$EXISTING" --body "$BODY" || true
+              echo "Commented on issue #$EXISTING"
+            else
+              gh issue create --repo "$GH_REPO" --title "$TITLE" --body "$BODY" || echo "Could not open issue (disabled?); see summary above."
+            fi
           else
-            gh issue create --title "$TITLE" --body "$BODY"
+            echo "Could not list/create issues (disabled or no permission); see step summary."
           fi
-          echo "### ⚠️ Conflicts — opened/updated Issue" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Fail when merge conflicts
+        if: steps.status.outputs.already_up_to_date != 'true' && steps.merge.outputs.conflict == 'true'
+        run: |
+          echo "Upstream merge has conflicts; resolve locally (keep fc branding) and push main."
+          exit 1
 
   # Same workflow run → no GITHUB_TOKEN cross-workflow dispatch needed.
   build-and-release:
