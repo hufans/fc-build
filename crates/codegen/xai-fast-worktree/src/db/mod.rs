@@ -6,6 +6,7 @@
 mod queries;
 mod schema;
 
+use std::ffi::OsString;
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -228,10 +229,10 @@ impl WorktreeDb {
             .with_context(|| format!("failed to set journal mode {}", mode.as_str()))
     }
 
-    /// Open the default DB at `~/.grok/worktrees.db`.
+    /// Open the default DB at `~/.fc/worktrees.db`.
     ///
-    /// Discovers grok home via `$GROK_HOME`, falling back to the canonicalized
-    /// `$HOME/.grok` (matching `xai_grok_config::grok_home`).
+    /// Discovers home via `$FC_HOME` / `$KIRO_HOME` / `$GROK_HOME`, falling back
+    /// to the canonicalized `<home>/.fc` (matching `xai_grok_config::grok_home`).
     /// Path is resolved fresh each call (~1µs env var read) to support
     /// test overrides. Each call opens its own connection — callers in hot
     /// paths should cache the `WorktreeDb` instance.
@@ -466,22 +467,24 @@ pub fn now_epoch_secs() -> i64 {
         .as_secs() as i64
 }
 
+/// Resolve the home: `$FC_HOME` / `$KIRO_HOME` / `$GROK_HOME`, else `<home>/.fc`.
+///
+/// Keep default dirname in sync with `xai_grok_config::paths` (`.fc`).
 pub fn resolve_grok_home() -> Result<PathBuf> {
-    // Prefer FC_HOME (fork) then prior / official overrides. Keep in sync
-    // with xai_grok_config::paths (default dir is `.fc`).
-    if let Ok(v) = std::env::var("FC_HOME")
-        .or_else(|_| std::env::var("KIRO_HOME"))
-        .or_else(|_| std::env::var("GROK_HOME"))
-    {
+    let override_home = std::env::var_os("FC_HOME")
+        .or_else(|| std::env::var_os("KIRO_HOME"))
+        .or_else(|| std::env::var_os("GROK_HOME"));
+    resolve_grok_home_from(override_home, dirs::home_dir())
+}
+
+fn resolve_grok_home_from(override_home: Option<OsString>, home: Option<PathBuf>) -> Result<PathBuf> {
+    if let Some(v) = override_home.filter(|v| !v.is_empty()) {
         return Ok(PathBuf::from(v));
     }
-    let home = PathBuf::from(
-        std::env::var("HOME").context("neither $FC_HOME nor $HOME is set")?,
-    );
-    // Canonicalize the home dir so worktree paths share the same physical
-    // config tree as trust/hooks even when it is symlinked. The dunce
-    // canonicalization must stay in sync with xai_grok_config::default_grok_home();
-    // home resolution deliberately differs ($HOME here vs std::env::home_dir()).
+    let home =
+        home.context("neither $FC_HOME/$GROK_HOME nor a home directory could be resolved")?;
+    // Canonicalize so worktree paths share the same physical config tree as
+    // trust/hooks even when home is symlinked.
     Ok(dunce::canonicalize(&home).unwrap_or(home).join(".fc"))
 }
 
