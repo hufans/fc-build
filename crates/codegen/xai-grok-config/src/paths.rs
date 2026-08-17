@@ -1,14 +1,17 @@
 //! Filesystem locations for the `fc` fork / official CLI config and binaries.
 //!
-//! Defaults to `~/.fc` and `$FC_HOME` so endpoint scanners that blocklist
-//! `~/.grok` / `~/.kiro` path fingerprints do not light up. Login and config
-//! keep the same on-disk formats; existing `~/.kiro` / `~/.grok` credentials
-//! are copied into `~/.fc` once on first launch.
+//! Defaults to `~/.fc` and `$FC_HOME` (via `xai_grok_home`) so endpoint scanners
+//! that blocklist `~/.grok` / `~/.kiro` path fingerprints do not light up.
+//! Existing `~/.kiro` / `~/.grok` credentials are copied into `~/.fc` once on
+//! first launch.
 
 use std::path::{Path, PathBuf};
 use std::sync::OnceLock;
 
-static GROK_HOME: OnceLock<PathBuf> = OnceLock::new();
+pub use xai_grok_home::{
+    DEFAULT_HOME_DIRNAME, LEGACY_HOME_DIRNAME, PRIOR_FORK_HOME_DIRNAME, default_grok_home,
+    user_grok_home,
+};
 
 #[cfg(target_os = "macos")]
 const CLAUDE_MANAGED_SETTINGS_PATH: &str =
@@ -16,62 +19,21 @@ const CLAUDE_MANAGED_SETTINGS_PATH: &str =
 #[cfg(target_os = "linux")]
 const CLAUDE_MANAGED_SETTINGS_PATH: &str = "/etc/claude-code/managed-settings.json";
 
-/// Dir name under `$HOME` for this fork (short, non-product path fingerprint).
-pub const DEFAULT_HOME_DIRNAME: &str = ".fc";
-
-/// Previous fork home dir — only used to seed credentials into
-/// [`DEFAULT_HOME_DIRNAME`].
-pub const PRIOR_FORK_HOME_DIRNAME: &str = ".kiro";
-
-/// Official CLI home dir name — only used to seed credentials into
-/// [`DEFAULT_HOME_DIRNAME`].
-pub const LEGACY_HOME_DIRNAME: &str = ".grok";
-
-/// Resolve `$FC_HOME` first, then prior fork / official overrides (compat).
-fn home_env_override() -> Option<PathBuf> {
-    std::env::var_os("FC_HOME")
-        .or_else(|| std::env::var_os("KIRO_HOME"))
-        .or_else(|| std::env::var_os("GROK_HOME"))
-        .map(PathBuf::from)
-}
-
-/// `$HOME` joined with `dirname`, with the same dunce canonicalization as
-/// [`default_grok_home`].
-fn home_join(dirname: &str) -> PathBuf {
-    #[allow(deprecated)]
-    let home = std::env::home_dir().unwrap_or_else(|| PathBuf::from("."));
-    dunce::canonicalize(&home).unwrap_or(home).join(dirname)
-}
-
-/// The default user config directory (`~/.fc`, canonicalized) used when
-/// no `FC_HOME` / prior-override env is set.
-///
-/// Uses [`dunce::canonicalize`] instead of [`std::fs::canonicalize`]: on
-/// Windows, std returns a verbatim path (`\\?\C:\Users\...`) which external
-/// tools choke on — e.g. `git clone` rejects `\\?\` destinations with
-/// "Invalid argument", breaking marketplace cache clones under
-/// `~/.fc/marketplace-cache`. `dunce` strips the prefix whenever the path
-/// is safely representable in legacy form; on non-Windows it is identical to
-/// `std::fs::canonicalize`.
-///
-/// Keep the dunce canonicalization in sync with the hand-rolled duplicate in
-/// `xai_fast_worktree::db::resolve_grok_home` (deliberately standalone crate).
-pub fn default_grok_home() -> PathBuf {
-    home_join(DEFAULT_HOME_DIRNAME)
-}
-
-/// Official `~/.grok` path (for one-time credential seeding only).
+/// Official `~/.grok` path (credential seed only).
 pub fn legacy_grok_home() -> PathBuf {
     home_join(LEGACY_HOME_DIRNAME)
 }
 
-/// Previous fork `~/.kiro` path (for one-time credential seeding only).
+/// Previous fork `~/.kiro` path (credential seed only).
 pub fn prior_fork_home() -> PathBuf {
     home_join(PRIOR_FORK_HOME_DIRNAME)
 }
 
-/// Auth + settings that make login work without re-OAuth. Sessions are
-/// intentionally not bulk-copied (large); they reappear as new work.
+fn home_join(dirname: &str) -> PathBuf {
+    let home = dirs::home_dir().unwrap_or_else(|| PathBuf::from("."));
+    dunce::canonicalize(&home).unwrap_or(home).join(dirname)
+}
+
 const SEED_FILES: &[&str] = &[
     "auth.json",
     "config.toml",
@@ -95,42 +57,26 @@ fn seed_files_from(src_home: &Path, new_home: &Path) {
     }
 }
 
-/// Copy login/config files from prior homes (`~/.kiro`, then `~/.grok`) into
-/// `new_home` when the destination is missing them. Does not keep those
-/// paths open after seeding, so open-file scans no longer point at them.
 fn seed_from_legacy_home(new_home: &Path) {
     // Explicit override: user chose the path; do not touch legacy.
-    if home_env_override().is_some() {
+    if std::env::var_os("FC_HOME")
+        .or_else(|| std::env::var_os("KIRO_HOME"))
+        .or_else(|| std::env::var_os("GROK_HOME"))
+        .is_some()
+    {
         return;
     }
-    // Prefer the previous fork home (already migrated login) over official.
     seed_files_from(&prior_fork_home(), new_home);
     seed_files_from(&legacy_grok_home(), new_home);
 }
 
 /// Per-user config directory: `$FC_HOME` (or prior overrides) or `~/.fc`.
-/// Created if needed. Seeds from prior homes once when using the default path.
+/// Seeds login/config from prior homes once when using the default path.
 pub fn grok_home() -> PathBuf {
-    GROK_HOME
-        .get_or_init(|| {
-            let grok_home = home_env_override().unwrap_or_else(default_grok_home);
-            let _ = std::fs::create_dir_all(&grok_home);
-            seed_from_legacy_home(&grok_home);
-            grok_home
-        })
-        .clone()
-}
-
-/// The user-global home, but only when one genuinely resolves: `Some` when
-/// a home override is set or a home directory is found, `None` otherwise.
-/// Unlike [`grok_home()`], this never falls back to a cwd-relative project
-/// tree, so callers that *scan* user-global resources (hooks, marketplace
-/// sources, ...) don't mistake a project's config tree for the user-global
-/// one when no home resolves.
-pub fn user_grok_home() -> Option<PathBuf> {
-    #[allow(deprecated)]
-    let resolvable = home_env_override().is_some() || std::env::home_dir().is_some();
-    resolvable.then(grok_home)
+    static SEEDED: OnceLock<()> = OnceLock::new();
+    let home = xai_grok_home::grok_home();
+    SEEDED.get_or_init(|| seed_from_legacy_home(&home));
+    home
 }
 
 /// Canonical application path: `$FC_HOME/bin/fc` (Unix) or `fc.exe` (Windows).
@@ -433,16 +379,6 @@ mod tests {
             std::fs::create_dir_all(&dir).unwrap();
             assert_eq!(decode_cwd_from_dirname(&dir).as_deref(), Some(cwd));
         }
-    }
-
-    #[test]
-    fn default_grok_home_has_no_verbatim_prefix() {
-        // On Windows, std::fs::canonicalize returns `\\?\C:\...` verbatim
-        // paths that external tools (notably `git clone`) reject. The dunce
-        // canonicalization must yield a plain path. No-op assertion on Unix.
-        let home = default_grok_home();
-        assert!(!home.to_string_lossy().starts_with(r"\\?\"));
-        assert!(home.ends_with(DEFAULT_HOME_DIRNAME));
     }
 
     #[cfg(unix)]

@@ -8,6 +8,7 @@ description = "Shared config loading for Grok — grok_home, effective config (r
 [dependencies]
 base64 = { workspace = true }
 blake3 = { workspace = true }
+dirs = { workspace = true }
 dunce = { workspace = true }
 # Shared signed deployment-config envelope contract with the cli-chat-proxy signer.
 prod-mc-cli-chat-proxy-types = { path = "../../../prod/mc/cli-chat-proxy-types" }
@@ -21,6 +22,7 @@ toml = { workspace = true }
 tracing = { workspace = true }
 urlencoding = { workspace = true }
 which = { workspace = true }
+xai-grok-home = { workspace = true }
 xai-tty-utils = { workspace = true }
 xai-grok-version = { workspace = true }
 

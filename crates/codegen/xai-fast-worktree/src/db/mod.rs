@@ -6,9 +6,7 @@
 mod queries;
 mod schema;
 
-use std::ffi::OsString;
 use std::path::{Path, PathBuf};
-use std::time::{SystemTime, UNIX_EPOCH};
 
 use anyhow::{Context, Result};
 use rusqlite::Connection;
@@ -231,11 +229,11 @@ impl WorktreeDb {
 
     /// Open the default DB at `~/.fc/worktrees.db`.
     ///
-    /// Discovers home via `$FC_HOME` / `$KIRO_HOME` / `$GROK_HOME`, falling back
-    /// to the canonicalized `<home>/.fc` (matching `xai_grok_config::grok_home`).
-    /// Path is resolved fresh each call (~1µs env var read) to support
-    /// test overrides. Each call opens its own connection — callers in hot
-    /// paths should cache the `WorktreeDb` instance.
+    /// Discovers home via `xai_grok_home::resolve_grok_home` (`$FC_HOME` /
+    /// `$KIRO_HOME` / `$GROK_HOME`, else `<home>/.fc`).
+    /// Path is resolved fresh each call (env read plus a canonicalize) to
+    /// support test overrides. Each call opens its own connection — callers in
+    /// hot paths should cache the `WorktreeDb` instance.
     pub fn open_default() -> Result<Self> {
         Self::open(&resolve_grok_home()?)
     }
@@ -443,7 +441,7 @@ impl WorktreeDb {
 ///
 /// The basename alone collides across repos, and `INSERT OR REPLACE` would then evict
 /// the other repo's record; hashing the full path keeps distinct worktrees distinct.
-pub fn id_from_path(path: &Path) -> String {
+pub(crate) fn id_from_path(path: &Path) -> String {
     let name = path
         .file_name()
         .map(|n| n.to_string_lossy())
@@ -453,7 +451,7 @@ pub fn id_from_path(path: &Path) -> String {
 }
 
 /// Extract the repo name (last component) from a source repo path.
-pub fn repo_name_from_path(source: &Path) -> String {
+pub(crate) fn repo_name_from_path(source: &Path) -> String {
     source
         .file_name()
         .map(|n| n.to_string_lossy().into_owned())
@@ -461,31 +459,15 @@ pub fn repo_name_from_path(source: &Path) -> String {
 }
 
 pub fn now_epoch_secs() -> i64 {
-    SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .unwrap_or_default()
-        .as_secs() as i64
+    crate::time::epoch_secs()
 }
 
 /// Resolve the home: `$FC_HOME` / `$KIRO_HOME` / `$GROK_HOME`, else `<home>/.fc`.
 ///
 /// Keep default dirname in sync with `xai_grok_config::paths` (`.fc`).
 pub fn resolve_grok_home() -> Result<PathBuf> {
-    let override_home = std::env::var_os("FC_HOME")
-        .or_else(|| std::env::var_os("KIRO_HOME"))
-        .or_else(|| std::env::var_os("GROK_HOME"));
-    resolve_grok_home_from(override_home, dirs::home_dir())
-}
-
-fn resolve_grok_home_from(override_home: Option<OsString>, home: Option<PathBuf>) -> Result<PathBuf> {
-    if let Some(v) = override_home.filter(|v| !v.is_empty()) {
-        return Ok(PathBuf::from(v));
-    }
-    let home =
-        home.context("neither $FC_HOME/$GROK_HOME nor a home directory could be resolved")?;
-    // Canonicalize so worktree paths share the same physical config tree as
-    // trust/hooks even when home is symlinked.
-    Ok(dunce::canonicalize(&home).unwrap_or(home).join(".fc"))
+    xai_grok_home::resolve_grok_home()
+        .context("neither $FC_HOME/$GROK_HOME nor a home directory could be resolved")
 }
 
 /// Serializes tests that mutate the process-global `GROK_HOME` env var so they
@@ -526,6 +508,8 @@ impl GrokHomeFixture {
         // race fix.
         let _ = WorktreeDb::open(&home);
         let prev = std::env::var_os("GROK_HOME");
+        // SAFETY: the fixture holds the GROK_HOME env lock for its whole
+        // lifetime, so no other test thread reads or writes the environment.
         unsafe { std::env::set_var("GROK_HOME", &home) };
         Self {
             _lock: lock,
@@ -539,6 +523,8 @@ impl GrokHomeFixture {
 #[cfg(test)]
 impl Drop for GrokHomeFixture {
     fn drop(&mut self) {
+        // SAFETY: the fixture still holds the GROK_HOME env lock here, so no
+        // other test thread reads or writes the environment during restore.
         unsafe {
             match self.prev.take() {
                 Some(p) => std::env::set_var("GROK_HOME", p),
