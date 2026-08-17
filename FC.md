@@ -40,11 +40,19 @@ git push origin main
 
 ## 3. 代码改动面（品牌 / 指纹）
 
+**自动规则（给 Agent，无需每次口头提醒）：**
+
+| 文件 | 用途 |
+|------|------|
+| [AGENTS.md](./AGENTS.md) | 进仓即生效的总则 |
+| [.fc/skills/fc-branding/SKILL.md](./.fc/skills/fc-branding/SKILL.md) | 合并上游 / 改运行时指纹时的强制清单与扫描命令 |
+
 | 文件 | 改动 |
 |------|------|
+| `xai-grok-home` | 默认 home **`~/.fc`**，env：`FC_HOME` → `KIRO_HOME` → `GROK_HOME` |
 | `xai-grok-pager-bin` | `[[bin]] name = "fc"`，`version_text` → `fc …` |
 | `cli.rs` / `completions_cmd.rs` | clap 展示名、补全按 `fc` |
-| `paths.rs` | 默认 home **`~/.fc`** |
+| `paths.rs` | 包装 home + 从 `.kiro`/`.grok` seed；二进制路径 `bin/fc` |
 | `static_shell.rs` / `shell_state.rs` / `embedded_search_tools.rs` | 子进程 argv：`FC_AGENT` / `__fc_*` |
 | hooks / notifications / auth child env | **`FC_*`**（不向子进程 export 产品旧名） |
 | 项目发现 | 优先 **`.fc/`**（agents / skills / workflows / sandbox / lsp） |
@@ -68,6 +76,8 @@ git push origin main
 strings "$(command -v fc 2>/dev/null || echo ~/.local/bin/fc)" \
   | grep -E 'FC_AGENT=1|__fc_user_cmd' | head
 ```
+
+合并上游后完整清单见 skill **`/fc-branding`**。
 
 **说明：** 源码 crate 路径仍沿用 monorepo 目录名；用户可见产品名与仓库名为 **fc** / **fc-build**。
 
