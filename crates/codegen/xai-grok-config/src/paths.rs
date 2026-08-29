@@ -1,6 +1,6 @@
 //! Filesystem locations for the `fc` fork / official CLI config and binaries.
 //!
-//! Defaults to `~/.fc` and `$FC_HOME` (via `xai_grok_home`) so endpoint scanners
+//! Defaults to `~/.fc` and `$FC_HOME` (via `xai_dirs`) so endpoint scanners
 //! that blocklist `~/.grok` / `~/.kiro` path fingerprints do not light up.
 //! Existing `~/.kiro` / `~/.grok` credentials are copied into `~/.fc` once on
 //! first launch.
@@ -8,7 +8,7 @@
 use std::path::{Path, PathBuf};
 use std::sync::OnceLock;
 
-pub use xai_grok_home::{
+pub use xai_dirs::{
     DEFAULT_HOME_DIRNAME, LEGACY_HOME_DIRNAME, PRIOR_FORK_HOME_DIRNAME, default_grok_home,
     user_grok_home,
 };
@@ -74,7 +74,7 @@ fn seed_from_legacy_home(new_home: &Path) {
 /// Seeds login/config from prior homes once when using the default path.
 pub fn grok_home() -> PathBuf {
     static SEEDED: OnceLock<()> = OnceLock::new();
-    let home = xai_grok_home::grok_home();
+    let home = xai_dirs::grok_home();
     SEEDED.get_or_init(|| seed_from_legacy_home(&home));
     home
 }
@@ -254,6 +254,11 @@ pub fn ensure_sessions_cwd_dir_in(
         match std::fs::File::create_new(&cwd_file) {
             Ok(mut f) => {
                 std::io::Write::write_all(&mut f, cwd.as_bytes())?;
+                // Fsync the write-capable create_new handle before drop.
+                // A later parent-dir sync would otherwise freeze a present
+                // but empty/torn marker that path recovery cannot fall back
+                // from. AlreadyExists skips rewrite (O_EXCL).
+                f.sync_all()?;
             }
             Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {}
             Err(e) => return Err(e),

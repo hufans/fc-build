@@ -229,7 +229,7 @@ impl WorktreeDb {
 
     /// Open the default DB at `~/.fc/worktrees.db`.
     ///
-    /// Discovers home via `xai_grok_home::resolve_grok_home` (`$FC_HOME` /
+    /// Discovers home via `xai_dirs::resolve_grok_home` (`$FC_HOME` /
     /// `$KIRO_HOME` / `$GROK_HOME`, else `<home>/.fc`).
     /// Path is resolved fresh each call (env read plus a canonicalize) to
     /// support test overrides. Each call opens its own connection — callers in
@@ -461,7 +461,7 @@ pub fn now_epoch_secs() -> i64 {
 ///
 /// Keep default dirname in sync with `xai_grok_config::paths` (`.fc`).
 pub fn resolve_grok_home() -> Result<PathBuf> {
-    xai_grok_home::resolve_grok_home()
+    xai_dirs::resolve_grok_home()
         .context("neither $FC_HOME/$GROK_HOME nor a home directory could be resolved")
 }
 
