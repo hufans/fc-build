@@ -40,6 +40,8 @@ git push origin main
 
 ## 3. 代码改动面（品牌 / 指纹）
 
+**硬约束：** 产品名 **`fc` 是安全名**。运行中的进程信息（进程名、argv、导出到子进程的环境变量、PTY wrap 标记、hook 子进程 env）**不能出现 Grok 产品指纹**，否则会被扫描/拦截。这不是文案偏好。源码 crate 目录可以仍叫 `xai-grok-*`；进程面上不行。
+
 **自动规则（给 Agent，无需每次口头提醒）：**
 
 | 文件 | 用途 |
@@ -49,7 +51,7 @@ git push origin main
 
 | 文件 | 改动 |
 |------|------|
-| `xai-grok-home` | 默认 home **`~/.fc`**，env：`FC_HOME` → `KIRO_HOME` → `GROK_HOME` |
+| `xai-dirs`（原 `xai-grok-home`） | 默认 home **`~/.fc`**，env：`FC_HOME` → `KIRO_HOME` → `GROK_HOME` |
 | `xai-grok-pager-bin` | `[[bin]] name = "fc"`，`version_text` → `fc …` |
 | `cli.rs` / `completions_cmd.rs` | clap 展示名、补全按 `fc` |
 | `paths.rs` | 包装 home + 从 `.kiro`/`.grok` seed；二进制路径 `bin/fc` |
