@@ -115,10 +115,9 @@ impl StaticShellSnapshot {
         Self { snapshot, shell }
     }
 
-    /// Build the replay wrapper: read the snapshot from fd 3, eval it (alias
-    /// and function definitions), then eval the user command; the shell exits
-    /// with the user command's status. A failing snapshot replay does not
-    /// abort the command.
+    /// Build the replay wrapper: read the snapshot from fd 3, eval it (alias and function
+    /// definitions), then eval the user command; the shell exits with the user command's status. A
+    /// failing snapshot replay does not abort the command.
     pub fn prepare_command(
         &self,
         user_command: &str,
@@ -328,12 +327,9 @@ mod tests {
         );
     }
 
-    /// Regression test: a script sourced WITHOUT arguments by the user command
-    /// must not see the wrapper's positional parameters ($1 = the whole
-    /// command string). Conda's `bin/activate` forwards "$@" to `conda
-    /// activate`, so a leak makes every `activate_conda`-prefixed command fail
-    /// with `EnvironmentLocationNotFound: Not a conda environment: <cwd>/<the
-    /// entire command string>`.
+    /// Regression test: a script sourced WITHOUT arguments by the user command must not see the wrapper's positional parameters ($1 = the whole
+    /// command string). Conda's `bin/activate` forwards "$@" to `conda activate`, so a leak makes every `activate_conda`-prefixed command fail with
+    /// `EnvironmentLocationNotFound: Not a conda environment: <cwd>/<the entire command string>`.
     #[tokio::test]
     async fn sourced_script_does_not_inherit_wrapper_positional_args() {
         if !bash_available() {

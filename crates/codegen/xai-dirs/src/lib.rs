@@ -59,7 +59,8 @@ fn grok_home_in(home: &Path) -> PathBuf {
 }
 
 /// Prefer `$FC_HOME`, then `$KIRO_HOME`, then `$GROK_HOME` when non-empty;
-/// else `<home>/.fc`. Env values are used as-is (not canonicalized).
+/// else `<home>/.fc`. Env values are used as-is (not canonicalized) so
+/// literal prefix checks and symlink guards still see original components.
 fn resolve_grok_home_from(
     fc_home: Option<&OsStr>,
     kiro_home: Option<&OsStr>,

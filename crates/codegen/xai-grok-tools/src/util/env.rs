@@ -50,10 +50,9 @@ pub fn apply_grok_agent_marker(cmd: &mut tokio::process::Command) {
     cmd.env(GROK_AGENT_ENV, GROK_AGENT_ENV_VALUE);
 }
 
-/// Expand the four plugin-path tokens (`${CLAUDE_PLUGIN_ROOT}` / `${GROK_PLUGIN_ROOT}`
-/// and `${CLAUDE_PLUGIN_DATA}` / `${GROK_PLUGIN_DATA}`) in `s`. Each pair is expanded
-/// only when its value is provided. Single source of truth for plugin agent bodies,
-/// plugin skill/command bodies, and plugin MCP/hook config substitution.
+/// Expand the four plugin-path tokens (`${CLAUDE_PLUGIN_ROOT}` / `${GROK_PLUGIN_ROOT}` and `${CLAUDE_PLUGIN_DATA}` /
+/// `${GROK_PLUGIN_DATA}`) in `s`. Each pair is expanded only when its value is provided. Single source of truth for
+/// plugin agent bodies, plugin skill/command bodies, and plugin MCP/hook config substitution.
 pub fn substitute_plugin_tokens(
     s: &str,
     plugin_root: Option<&str>,
