@@ -353,13 +353,7 @@ pub async fn run_command_hook(
                     if exit_code == 0 {
                         (HookRunnerResult::Success, elapsed)
                     } else {
-                        (
-                            HookRunnerResult::Failed(append_stderr_line(
-                                &format!("exit code {exit_code}"),
-                                &stderr,
-                            )),
-                            elapsed,
-                        )
+                        (failed_with_exit_code(exit_code, &stderr), elapsed)
                     }
                 }
                 GateKind::Tool => {
@@ -679,9 +673,10 @@ fn append_stderr_line(message: &str, stderr: &str) -> String {
     }
 }
 
-fn failed_with_exit_code(hook_name: &str, exit_code: i32, stderr: &str) -> HookRunnerResult {
+/// Same shape in every mode (`exit code N: <first stderr line>`); the dispatcher and the UI name the hook and the verb.
+fn failed_with_exit_code(exit_code: i32, stderr: &str) -> HookRunnerResult {
     HookRunnerResult::Failed(append_stderr_line(
-        &format!("hook '{hook_name}' failed with exit code {exit_code}"),
+        &format!("exit code {exit_code}"),
         stderr,
     ))
 }
@@ -800,7 +795,7 @@ fn parse_blocking_result(
             },
             elapsed,
         ),
-        _ => (failed_with_exit_code(hook_name, exit_code, stderr), elapsed),
+        _ => (failed_with_exit_code(exit_code, stderr), elapsed),
     }
 }
 
@@ -848,7 +843,7 @@ fn parse_stop_result(
                 elapsed,
             )
         }
-        _ => (failed_with_exit_code(hook_name, exit_code, stderr), elapsed),
+        _ => (failed_with_exit_code(exit_code, stderr), elapsed),
     }
 }
 
@@ -914,13 +909,7 @@ fn parse_prompt_result(
             },
             elapsed,
         ),
-        _ => (
-            HookRunnerResult::Failed(append_stderr_line(
-                &format!("hook '{hook_name}' failed with exit code {exit_code}"),
-                stderr,
-            )),
-            elapsed,
-        ),
+        _ => (failed_with_exit_code(exit_code, stderr), elapsed),
     }
 }
 
@@ -962,10 +951,7 @@ fn parse_post_tool_use_result(
     }
 
     if exit_code != 0 && exit_code != GATE_EXIT_CODE {
-        let exit_failure = append_stderr_line(
-            &format!("hook '{hook_name}' failed with exit code {exit_code}"),
-            stderr,
-        );
+        let exit_failure = append_stderr_line(&format!("exit code {exit_code}"), stderr);
         if outcome.is_empty() {
             return (HookRunnerResult::Failed(exit_failure), elapsed);
         }
@@ -1064,7 +1050,7 @@ mod tests {
         match result {
             HookRunnerResult::Deny { reason, .. } => assert_eq!(
                 reason,
-                "unknown decision value 'denied' in 'hookSpecificOutput.permissionDecision' from hook 'typo': writes outside the repo"
+                "unknown decision value 'denied' in 'hookSpecificOutput.permissionDecision': writes outside the repo"
             ),
             other => panic!("expected Deny, got {other:?}"),
         }
@@ -1079,7 +1065,7 @@ mod tests {
         match result {
             HookRunnerResult::Deny { reason, .. } => assert!(
                 reason.starts_with(
-                    "unknown decision value 'denied' in 'hookSpecificOutput.permissionDecision' from hook 'typo'"
+                    "unknown decision value 'denied' in 'hookSpecificOutput.permissionDecision'"
                 ),
                 "the error must survive a full-length stderr line, got: {reason}"
             ),
@@ -1124,7 +1110,7 @@ mod tests {
             (r#"{"decision":"deny"}"#, "deny: denied by hook 'test'"),
             (
                 r#"{"decision":"maybe"}"#,
-                "failed: unknown decision value 'maybe' in 'decision' from hook 'test'",
+                "failed: unknown decision value 'maybe' in 'decision'",
             ),
             (
                 r#"{"decision":"allow","continue":false,"systemMessage":"hi"}"#,
@@ -1183,7 +1169,7 @@ mod tests {
             ),
             (
                 r#"{"hookSpecificOutput":{"permissionDecision":"maybe"}}"#,
-                "failed: unknown decision value 'maybe' in 'hookSpecificOutput.permissionDecision' from hook 'test'",
+                "failed: unknown decision value 'maybe' in 'hookSpecificOutput.permissionDecision'",
             ),
             (
                 r#"{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"defer","permissionDecisionReason":"because"}}"#,
@@ -1196,7 +1182,7 @@ mod tests {
             ),
             (
                 r#"{"decision":"defer","hookSpecificOutput":{"permissionDecision":"maybe"}}"#,
-                "failed: unknown decision value 'maybe' in 'hookSpecificOutput.permissionDecision' from hook 'test'",
+                "failed: unknown decision value 'maybe' in 'hookSpecificOutput.permissionDecision'",
             ),
         ] {
             assert_eq!(summarize(parse(json)), expected, "for {json}");
@@ -1350,11 +1336,11 @@ mod tests {
         let cases = [
             (
                 r#"{"decision":"maybe"}"#,
-                "unknown decision value 'maybe' in 'decision' from hook 'test'",
+                "unknown decision value 'maybe' in 'decision'",
             ),
             (
                 r#"{"hookSpecificOutput":{"permissionDecision":"maybe"}}"#,
-                "unknown decision value 'maybe' in 'hookSpecificOutput.permissionDecision' from hook 'test'",
+                "unknown decision value 'maybe' in 'hookSpecificOutput.permissionDecision'",
             ),
         ];
         for (json, expected) in cases {
@@ -2037,6 +2023,7 @@ mod tests {
             session_id: "test-session",
             workspace_root: "/tmp",
             process_scope: None,
+            disabled: Default::default(),
         }
     }
 
@@ -2137,6 +2124,7 @@ mod tests {
             session_id: "test-session",
             workspace_root: &workspace,
             process_scope: None,
+            disabled: Default::default(),
         };
         let (result, _, _) = run_command_hook(&spec, &envelope, &ctx, GateKind::Observe).await;
 
