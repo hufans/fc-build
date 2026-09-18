@@ -154,10 +154,7 @@ fn install_destinations() -> Vec<PathBuf> {
         // Prefer paths without a `grok` path segment (scanner fingerprint).
         // Still refresh a legacy `~/.grok/bin/fc` if that is the running
         // binary, via `current_exe` above — but do not re-create that path.
-        for p in [
-            home.join(".local/bin/fc"),
-            home.join(".fc/bin/fc"),
-        ] {
+        for p in [home.join(".local/bin/fc"), home.join(".fc/bin/fc")] {
             if p.exists() && !dests.iter().any(|d| d == &p) {
                 dests.push(p);
             }

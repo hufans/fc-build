@@ -133,7 +133,10 @@ pub(crate) fn run_wrapped_command(program: &str, args: &[String]) -> Result<i32>
             match stdin.read(&mut buf) {
                 Ok(0) | Err(_) => break,
                 Ok(n) => {
-                    if stdin_tx.send(buf[..n].to_vec()).is_err() {
+                    let Some(chunk) = buf.get(..n) else {
+                        break;
+                    };
+                    if stdin_tx.send(chunk.to_vec()).is_err() {
                         break;
                     }
                 }
@@ -172,7 +175,10 @@ pub(crate) fn run_wrapped_command(program: &str, args: &[String]) -> Result<i32>
             match pty_reader.read(&mut buf) {
                 Ok(0) | Err(_) => break,
                 Ok(n) => {
-                    let filtered = filter.feed(&buf[..n]);
+                    let Some(chunk) = buf.get(..n) else {
+                        break;
+                    };
+                    let filtered = filter.feed(chunk);
                     if !filtered.is_empty() {
                         if stdout.write_all(&filtered).is_err() {
                             break;
@@ -277,7 +283,10 @@ fn write_stdout_unlocked(bytes: &[u8]) {
         let rc = unsafe {
             libc::write(
                 1,
-                bytes[written..].as_ptr() as *const libc::c_void,
+                match bytes.get(written..) {
+                    Some(rest) => rest.as_ptr() as *const libc::c_void,
+                    None => break,
+                },
                 bytes.len() - written,
             )
         };

@@ -71,7 +71,8 @@ mod expand_home_tests {
         );
     }
 }
-fn matches_trusted_base_url(candidate: &str, trusted_base: &str) -> bool {
+/// True when `candidate` is `trusted_base` or a path under it (same scheme, host, and port).
+pub fn matches_trusted_base_url(candidate: &str, trusted_base: &str) -> bool {
     let Ok(candidate) = reqwest::Url::parse(candidate) else {
         return false;
     };
@@ -175,12 +176,10 @@ pub fn truncate(s: &str, max_chars: usize) -> &str {
     if s.len() <= max_chars {
         return s;
     }
-    let end = s
-        .char_indices()
-        .nth(max_chars)
-        .map(|(i, _)| i)
-        .unwrap_or(s.len());
-    &s[..end]
+    match s.char_indices().nth(max_chars) {
+        Some((i, _)) => s.get(..i).unwrap_or(s),
+        None => s,
+    }
 }
 /// Check if a process is still alive.
 /// Unix: `kill(pid, 0)` via `nix`. True if the process exists (even under a different UID); false only on ESRCH.
@@ -304,10 +303,7 @@ fn process_name_looks_like_grok_cli(name: &str) -> bool {
     lower
         .split(|c: char| c == '/' || c == '\\' || c == '\0' || c.is_whitespace())
         .any(|part| {
-            let stem = part
-                .rsplit_once('.')
-                .map(|(s, _)| s)
-                .unwrap_or(part);
+            let stem = part.rsplit_once('.').map(|(s, _)| s).unwrap_or(part);
             // Current fork name, plus prior rebrands / official for orphan cleanup.
             matches!(stem, "fc" | "kiro" | "grok" | "xai-grok-pager")
         })
@@ -348,7 +344,10 @@ pub fn is_grok_process(pid: u32) -> bool {
         if result.is_err() {
             return false;
         }
-        process_name_looks_like_grok_cli(&String::from_utf16_lossy(&buf[..size as usize]))
+        let Some(name) = buf.get(..size as usize) else {
+            return false;
+        };
+        process_name_looks_like_grok_cli(&String::from_utf16_lossy(name))
     }
     #[cfg(all(not(target_os = "linux"), not(windows)))]
     {

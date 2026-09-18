@@ -823,7 +823,11 @@ mod tests {
             );
             let (specs, errors) = parse_hooks_from_config_layers(std::slice::from_ref(&layer));
             assert!(errors.is_empty(), "{source_name}: {errors:?}");
-            let name = &specs[0].name;
+            let name = specs
+                .first()
+                .unwrap_or_else(|| panic!("expected specs item 0: {specs:?}"))
+                .name
+                .as_str();
             assert_eq!(hook_display_name(name), expected, "for stamped name {name}");
             assert_eq!(
                 expected == "a managed policy hook",
@@ -852,7 +856,9 @@ mod tests {
         let (specs, errors) = parse_hooks_from_config_layers(std::slice::from_ref(&layer));
         assert!(errors.is_empty(), "unexpected errors: {errors:?}");
         assert_eq!(specs.len(), 1);
-        let s = &specs[0];
+        let s = specs
+            .first()
+            .unwrap_or_else(|| panic!("expected specs item 0: {specs:?}"));
         assert_eq!(s.event, HookEventName::PreToolUse);
         assert_eq!(s.handler_type, HandlerType::Command);
         assert_eq!(s.timeout_ms, 2000);
@@ -868,7 +874,13 @@ mod tests {
         );
         let (specs, _errors) = parse_hooks_from_config_layers(std::slice::from_ref(&layer));
         assert_eq!(specs.len(), 1);
-        assert_eq!(specs[0].event, HookEventName::PostToolUse);
+        assert_eq!(
+            specs
+                .first()
+                .unwrap_or_else(|| panic!("expected specs item 0: {specs:?}"))
+                .event,
+            HookEventName::PostToolUse
+        );
     }
 
     #[test]
@@ -898,7 +910,10 @@ mod tests {
         let registry = crate::discovery::registry_from_specs_deduped(dup);
         let pre = registry.hooks_for(HookEventName::PreToolUse);
         assert_eq!(pre.len(), 1);
-        assert!(pre[0].name.starts_with("managed:"), "got {}", pre[0].name);
+        let Some(hook) = pre.first() else {
+            panic!("expected one PreToolUse hook: {pre:?}");
+        };
+        assert!(hook.name.starts_with("managed:"), "got {}", hook.name);
     }
 
     #[test]
@@ -918,7 +933,9 @@ mod tests {
         let (specs, errors) = parse_hook_file(json, Path::new("/tmp/hooks/test.json"));
         assert!(errors.is_empty(), "unexpected errors: {errors:?}");
         assert_eq!(specs.len(), 1);
-        let s = &specs[0];
+        let s = specs
+            .first()
+            .unwrap_or_else(|| panic!("expected specs item 0: {specs:?}"));
         assert_eq!(s.event, HookEventName::PreToolUse);
         assert!(s.matcher.is_some());
         assert!(s.enabled);
@@ -944,8 +961,20 @@ mod tests {
         let (specs, errors) = parse_hook_file(json, Path::new("/tmp/test.json"));
         assert!(errors.is_empty());
         assert_eq!(specs.len(), 2);
-        assert_eq!(specs[0].command, Some(PathBuf::from("a.sh")));
-        assert_eq!(specs[1].command, Some(PathBuf::from("b.sh")));
+        assert_eq!(
+            specs
+                .first()
+                .unwrap_or_else(|| panic!("expected specs item 0: {specs:?}"))
+                .command,
+            Some(PathBuf::from("a.sh"))
+        );
+        assert_eq!(
+            specs
+                .get(1)
+                .unwrap_or_else(|| panic!("expected specs item 1: {specs:?}"))
+                .command,
+            Some(PathBuf::from("b.sh"))
+        );
     }
 
     #[test]
@@ -959,7 +988,13 @@ mod tests {
         }"#;
         let (specs, errors) = parse_hook_file(json, Path::new("/tmp/test.json"));
         assert!(errors.is_empty());
-        assert!(specs[0].matcher.is_none());
+        assert!(
+            specs
+                .first()
+                .unwrap_or_else(|| panic!("expected specs item 0: {specs:?}"))
+                .matcher
+                .is_none()
+        );
     }
 
     #[test]
@@ -973,7 +1008,13 @@ mod tests {
         }"#;
         let (specs, errors) = parse_hook_file(json, Path::new("/tmp/test.json"));
         assert!(errors.is_empty());
-        assert!(specs[0].matcher.is_none());
+        assert!(
+            specs
+                .first()
+                .unwrap_or_else(|| panic!("expected specs item 0: {specs:?}"))
+                .matcher
+                .is_none()
+        );
     }
 
     #[test]
@@ -1040,8 +1081,25 @@ mod tests {
         let json = r#"{ "hooks": { "Stop": [{ "hooks": [{ "type": "command", "command": "s.sh", "timeout": 0 }] }] } }"#;
         let (specs, errors) = parse_hook_file(json, Path::new("/tmp/test.json"));
         assert!(errors.is_empty(), "unexpected errors: {errors:?}");
-        assert_ne!(specs[0].timeout_ms, 0);
-        assert_eq!(specs[0].timeout_ms, default_timeout_ms(specs[0].event));
+        assert_ne!(
+            specs
+                .first()
+                .unwrap_or_else(|| panic!("expected specs item 0: {specs:?}"))
+                .timeout_ms,
+            0
+        );
+        assert_eq!(
+            specs
+                .first()
+                .unwrap_or_else(|| panic!("expected specs item 0: {specs:?}"))
+                .timeout_ms,
+            default_timeout_ms(
+                specs
+                    .first()
+                    .unwrap_or_else(|| panic!("expected specs item 0: {specs:?}"))
+                    .event
+            )
+        );
     }
 
     #[test]
@@ -1057,7 +1115,10 @@ mod tests {
                 format!(r#"{{ "hooks": {{ "SessionEnd": [{{ "hooks": [{handler}] }}] }} }}"#);
             let (specs, errors) = parse_hook_file(&json, Path::new("/tmp/test.json"));
             assert!(errors.is_empty(), "unexpected errors: {errors:?}");
-            specs[0].timeout_ms
+            specs
+                .first()
+                .unwrap_or_else(|| panic!("expected specs item 0: {specs:?}"))
+                .timeout_ms
         }
         assert_eq!(timeout_ms(None), SESSION_END_HOOK_BUDGET_DEFAULT_MS);
         assert_eq!(timeout_ms(Some(10)), 10_000);
@@ -1077,7 +1138,12 @@ mod tests {
         let (specs, errors) = parse_hook_file(json, Path::new("/tmp/test.json"));
         assert!(errors.is_empty(), "unexpected errors: {errors:?}");
         assert_eq!(specs.len(), 1);
-        let matcher = specs[0].matcher.as_ref().expect("matcher compiles");
+        let matcher = specs
+            .first()
+            .unwrap_or_else(|| panic!("expected specs item 0: {specs:?}"))
+            .matcher
+            .as_ref()
+            .expect("matcher compiles");
         assert!(matcher.is_match("startup"));
         assert!(!matcher.is_match("clear"));
     }
@@ -1150,7 +1216,12 @@ mod tests {
         let (specs, errors) = parse_hook_file(json, Path::new("/tmp/test.json"));
         assert!(specs.is_empty());
         assert_eq!(errors.len(), 1);
-        assert!(matches!(&errors[0], HookError::InvalidMatcher { .. }));
+        assert!(matches!(
+            errors
+                .first()
+                .unwrap_or_else(|| panic!("expected errors item 0: {errors:?}")),
+            HookError::InvalidMatcher { .. }
+        ));
     }
 
     #[test]
@@ -1159,7 +1230,12 @@ mod tests {
         let (specs, errors) = parse_hook_file(json, Path::new("/tmp/test.json"));
         assert!(specs.is_empty());
         assert_eq!(errors.len(), 1);
-        assert!(matches!(&errors[0], HookError::ParseFile { .. }));
+        assert!(matches!(
+            errors
+                .first()
+                .unwrap_or_else(|| panic!("expected errors item 0: {errors:?}")),
+            HookError::ParseFile { .. }
+        ));
     }
 
     #[test]
@@ -1175,7 +1251,9 @@ mod tests {
         assert!(specs.is_empty());
         assert_eq!(errors.len(), 1);
         assert!(matches!(
-            &errors[0],
+            errors
+                .first()
+                .unwrap_or_else(|| panic!("expected errors item 0: {errors:?}")),
             HookError::UnsupportedHandlerType { .. }
         ));
     }
@@ -1192,10 +1270,26 @@ mod tests {
         let (specs, errors) = parse_hook_file(json, Path::new("/tmp/test.json"));
         assert!(errors.is_empty());
         assert_eq!(specs.len(), 1);
-        assert_eq!(specs[0].handler_type, HandlerType::Http);
-        assert!(specs[0].command.is_none());
         assert_eq!(
-            specs[0].url.as_deref(),
+            specs
+                .first()
+                .unwrap_or_else(|| panic!("expected specs item 0: {specs:?}"))
+                .handler_type,
+            HandlerType::Http
+        );
+        assert!(
+            specs
+                .first()
+                .unwrap_or_else(|| panic!("expected specs item 0: {specs:?}"))
+                .command
+                .is_none()
+        );
+        assert_eq!(
+            specs
+                .first()
+                .unwrap_or_else(|| panic!("expected specs item 0: {specs:?}"))
+                .url
+                .as_deref(),
             Some("https://hooks.example.com/check")
         );
     }
@@ -1212,7 +1306,12 @@ mod tests {
         let (specs, errors) = parse_hook_file(json, Path::new("/tmp/test.json"));
         assert!(specs.is_empty());
         assert_eq!(errors.len(), 1);
-        assert!(matches!(&errors[0], HookError::InvalidConfig { .. }));
+        assert!(matches!(
+            errors
+                .first()
+                .unwrap_or_else(|| panic!("expected errors item 0: {errors:?}")),
+            HookError::InvalidConfig { .. }
+        ));
     }
 
     #[test]
@@ -1220,7 +1319,13 @@ mod tests {
         let json =
             r#"{"hooks":{"SessionStart":[{"hooks":[{"type":"command","command":"x.sh"}]}]}}"#;
         let (specs, _) = parse_hook_file(json, Path::new("/home/user/.grok/hooks/safety.json"));
-        assert_eq!(specs[0].source_dir, PathBuf::from("/home/user/.grok/hooks"));
+        assert_eq!(
+            specs
+                .first()
+                .unwrap_or_else(|| panic!("expected specs item 0: {specs:?}"))
+                .source_dir,
+            PathBuf::from("/home/user/.grok/hooks")
+        );
     }
 
     #[test]
@@ -1340,9 +1445,19 @@ mod tests {
             let (specs, errors) = parse_hook_file(&json, Path::new("/tmp/test.json"));
             assert!(errors.is_empty(), "unexpected errors: {errors:?}");
             assert_eq!(specs.len(), 1);
-            assert_eq!(specs[0].command, Some(PathBuf::from("/usr/local/check.sh")));
             assert_eq!(
-                specs[0].command_raw.as_deref(),
+                specs
+                    .first()
+                    .unwrap_or_else(|| panic!("expected specs item 0: {specs:?}"))
+                    .command,
+                Some(PathBuf::from("/usr/local/check.sh"))
+            );
+            assert_eq!(
+                specs
+                    .first()
+                    .unwrap_or_else(|| panic!("expected specs item 0: {specs:?}"))
+                    .command_raw
+                    .as_deref(),
                 Some(format!("${{{key}}}/check.sh").as_str())
             );
         });
@@ -1365,11 +1480,19 @@ mod tests {
             assert!(errors.is_empty(), "unexpected errors: {errors:?}");
             assert_eq!(specs.len(), 1);
             assert_eq!(
-                specs[0].url.as_deref(),
+                specs
+                    .first()
+                    .unwrap_or_else(|| panic!("expected specs item 0: {specs:?}"))
+                    .url
+                    .as_deref(),
                 Some("https://hooks.example.com/check")
             );
             assert_eq!(
-                specs[0].url_raw.as_deref(),
+                specs
+                    .first()
+                    .unwrap_or_else(|| panic!("expected specs item 0: {specs:?}"))
+                    .url_raw
+                    .as_deref(),
                 Some(format!("https://${{{key}}}/check").as_str())
             );
         });
@@ -1395,13 +1518,30 @@ mod tests {
         let (specs, errors) = parse_hook_file(json, Path::new("/tmp/test.json"));
         assert!(errors.is_empty(), "unexpected errors: {errors:?}");
         assert_eq!(specs.len(), 1);
-        assert_eq!(specs[0].extra_env.len(), 2);
         assert_eq!(
-            specs[0].extra_env.get("FOO").map(String::as_str),
+            specs
+                .first()
+                .unwrap_or_else(|| panic!("expected specs item 0: {specs:?}"))
+                .extra_env
+                .len(),
+            2
+        );
+        assert_eq!(
+            specs
+                .first()
+                .unwrap_or_else(|| panic!("expected specs item 0: {specs:?}"))
+                .extra_env
+                .get("FOO")
+                .map(String::as_str),
             Some("bar")
         );
         assert_eq!(
-            specs[0].extra_env.get("BAZ").map(String::as_str),
+            specs
+                .first()
+                .unwrap_or_else(|| panic!("expected specs item 0: {specs:?}"))
+                .extra_env
+                .get("BAZ")
+                .map(String::as_str),
             Some("qux")
         );
     }
@@ -1427,12 +1567,27 @@ mod tests {
         assert!(errors.is_empty(), "unexpected errors: {errors:?}");
         assert_eq!(specs.len(), 1);
         assert_eq!(
-            specs[0].command,
+            specs
+                .first()
+                .unwrap_or_else(|| panic!("expected specs item 0: {specs:?}"))
+                .command,
             Some(PathBuf::from("/from/env-map/check.sh"))
         );
-        assert_eq!(specs[0].extra_env.len(), 1);
         assert_eq!(
-            specs[0].extra_env.get("MY_HOOK_ROOT").map(String::as_str),
+            specs
+                .first()
+                .unwrap_or_else(|| panic!("expected specs item 0: {specs:?}"))
+                .extra_env
+                .len(),
+            1
+        );
+        assert_eq!(
+            specs
+                .first()
+                .unwrap_or_else(|| panic!("expected specs item 0: {specs:?}"))
+                .extra_env
+                .get("MY_HOOK_ROOT")
+                .map(String::as_str),
             Some("/from/env-map")
         );
     }
@@ -1453,7 +1608,9 @@ mod tests {
             let (specs, errors) = parse_hook_file(&json, Path::new("/tmp/test.json"));
             assert!(errors.is_empty(), "unexpected errors: {errors:?}");
             assert_eq!(specs.len(), 1);
-            let cmd = specs[0]
+            let cmd = specs
+                .first()
+                .unwrap_or_else(|| panic!("expected specs item 0: {specs:?}"))
                 .command
                 .as_ref()
                 .unwrap()
@@ -1479,7 +1636,12 @@ mod tests {
             let (specs, errors) = parse_hook_file(&json, Path::new("/tmp/test.json"));
             assert!(errors.is_empty(), "unexpected errors: {errors:?}");
             assert_eq!(specs.len(), 1);
-            let url = specs[0].url.as_deref().unwrap_or("");
+            let url = specs
+                .first()
+                .unwrap_or_else(|| panic!("expected specs item 0: {specs:?}"))
+                .url
+                .as_deref()
+                .unwrap_or("");
             assert_eq!(url, format!("https://${{{key}}}/check"));
         });
     }
@@ -1500,7 +1662,13 @@ mod tests {
         let (specs, errors) = parse_hook_file(json, Path::new("/tmp/test.json"));
         assert!(errors.is_empty(), "unexpected errors: {errors:?}");
         assert_eq!(specs.len(), 1);
-        assert!(specs[0].extra_env.is_empty());
+        assert!(
+            specs
+                .first()
+                .unwrap_or_else(|| panic!("expected specs item 0: {specs:?}"))
+                .extra_env
+                .is_empty()
+        );
     }
 
     #[test]
@@ -1524,7 +1692,12 @@ mod tests {
         assert!(errors.is_empty(), "unexpected errors: {errors:?}");
         assert_eq!(specs.len(), 1);
         assert_eq!(
-            specs[0].extra_env.get("BAR").map(String::as_str),
+            specs
+                .first()
+                .unwrap_or_else(|| panic!("expected specs item 0: {specs:?}"))
+                .extra_env
+                .get("BAR")
+                .map(String::as_str),
             Some("${HOME}/x"),
             "env values must be stored verbatim, not recursively expanded"
         );
@@ -1551,10 +1724,19 @@ mod tests {
             assert!(errors.is_empty(), "unexpected errors: {errors:?}");
             assert_eq!(specs.len(), 1);
             assert_eq!(
-                specs[0].configured_matcher.as_deref(),
+                specs
+                    .first()
+                    .unwrap_or_else(|| panic!("expected specs item 0: {specs:?}"))
+                    .configured_matcher
+                    .as_deref(),
                 Some(pattern.as_str())
             );
-            let stored = specs[0].configured_matcher.as_deref().unwrap_or("");
+            let stored = specs
+                .first()
+                .unwrap_or_else(|| panic!("expected specs item 0: {specs:?}"))
+                .configured_matcher
+                .as_deref()
+                .unwrap_or("");
             assert!(
                 !stored.contains("expanded_value_should_not_appear"),
                 "matcher must NOT be env-expanded, got {stored:?}"
@@ -1639,15 +1821,34 @@ mod tests {
             "CLAUDE_PROJECT_DIR",
         ] {
             assert!(
-                !specs[0].extra_env.contains_key(reserved),
+                !specs
+                    .first()
+                    .unwrap_or_else(|| panic!("expected specs item 0: {specs:?}"))
+                    .extra_env
+                    .contains_key(reserved),
                 "reserved key {reserved} must be stripped, got {:?}",
-                specs[0].extra_env
+                specs
+                    .first()
+                    .unwrap_or_else(|| panic!("expected specs item 0: {specs:?}"))
+                    .extra_env
             );
         }
         assert_eq!(
-            specs[0].extra_env.get("USER_KEY").map(String::as_str),
+            specs
+                .first()
+                .unwrap_or_else(|| panic!("expected specs item 0: {specs:?}"))
+                .extra_env
+                .get("USER_KEY")
+                .map(String::as_str),
             Some("kept")
         );
-        assert_eq!(specs[0].extra_env.len(), 1);
+        assert_eq!(
+            specs
+                .first()
+                .unwrap_or_else(|| panic!("expected specs item 0: {specs:?}"))
+                .extra_env
+                .len(),
+            1
+        );
     }
 }
