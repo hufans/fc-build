@@ -11,16 +11,18 @@ This repository is **[hufans/fc-build](https://github.com/hufans/fc-build)** (`f
    - resolve merge conflicts,
    - touch home paths, env sentinels, shell wrap, CLI name, install/update, or discovery,
    - push runtime-affecting changes.
-2. **Runtime process fingerprints must stay `fc`.** Never ship new (or reintroduce) Grok process markers:
+2. Load **`fc-actions`** (`.fc/skills/fc-actions/SKILL.md`) when the user reports GitHub Actions / CI failures (including “处理一下”). Do not ask them to restate fc branding.
+3. **Runtime process fingerprints must stay `fc`.** Never ship new (or reintroduce) Grok process markers:
    - binary / clap / version line: `fc`
    - home: `~/.fc` / `$FC_HOME` first
    - tool-shell: export **`FC_AGENT=1` only**; strip `GROK_AGENT` / `KIRO_AGENT` from children
    - wrap argv: `__fc_*` only — never `grok` in `-c` wrappers
    - hook / wrap / auth child env: **`FC_*`**; strip inherited `GROK_*` product keys when injecting FC_*
-3. Crate directory names may remain `xai-grok-*` (upstream layout). That is **not** a license to put `grok` in user-facing CLI name, default config dir, or **any child-process argv/env**.
-4. Maintainer handbook: [FC.md](./FC.md). User install: [README.md](./README.md). Authoritative runtime checklist: `.fc/skills/fc-branding/SKILL.md`.
+4. Crate directory names may remain `xai-grok-*` (upstream layout). That is **not** a license to put `grok` in user-facing CLI name, default config dir, or **any child-process argv/env**.
+5. Maintainer handbook: [FC.md](./FC.md). User install: [README.md](./README.md). Authoritative runtime checklist: `.fc/skills/fc-branding/SKILL.md`.
 
 ## Upstream sync
 
 - Prefer functional upstream changes; on conflicts, **keep fc branding** (see `fc-branding` skill).
 - After sync: run the skill checklist, then push so **Build fc** refreshes `continuous`.
+- Actions 红了：走 **`fc-actions`**，不要再问品牌背景。

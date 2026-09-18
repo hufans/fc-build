@@ -137,7 +137,9 @@ push main → matrix 编译 → continuous Release
 
 - **每 6 小时**（UTC `0 */6 * * *`）及手动 `workflow_dispatch`：检查 `xai-org/grok-build`
 - 有更新且无冲突 → merge → push `main` → `workflow_call` **Build fc** → 刷新 `continuous` Release  
-- 有冲突 → Issue（或仓库禁用 Issue 时看 Actions 日志），本地 resolve 后 push  
+- 有冲突 → Agent 走 skill **`fc-actions`**（品牌规则在 **`fc-branding`**），本地 resolve 后 push  
+
+用户只需说「GitHub Actions 错了，处理一下」。
 
 ```sh
 git fetch upstream   # 若已配置
